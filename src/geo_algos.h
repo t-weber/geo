@@ -18,6 +18,7 @@
 
 #include "math_algos.h"
 #include "math_conts.h"
+#include "helpers.h"
 
 #include <libqhullcpp/Qhull.h>
 #include <libqhullcpp/QhullFacet.h>
@@ -418,71 +419,99 @@ requires m::is_vec<t_vec>
 
 	// contour determination
 	{
-		std::list<t_vec> contour_left, contour_right;
+		std::list<t_vec> contour_left_top, contour_left_bottom;
 		std::pair<t_real, t_real> minmax_y_left
-			= std::make_pair(std::numeric_limits<t_real>::max(), -std::numeric_limits<t_real>::max());
-		std::pair<t_real, t_real> minmax_y_right
 			= std::make_pair(std::numeric_limits<t_real>::max(), -std::numeric_limits<t_real>::max());
 
 		for(const t_vec& vec : verts)
 		{
+			if(vec[1] > std::get<1>(minmax_y_left))
+			{
+				std::get<1>(minmax_y_left) = vec[1];
+				contour_left_top.push_back(vec);
+			}
 			if(vec[1] < std::get<0>(minmax_y_left))
 			{
 				std::get<0>(minmax_y_left) = vec[1];
-				contour_left.push_front(vec);
-			}
-			else if(vec[1] > std::get<1>(minmax_y_left))
-			{
-				std::get<1>(minmax_y_left) = vec[1];
-				contour_left.push_back(vec);
+				contour_left_bottom.push_front(vec);
 			}
 		}
+
+
+		std::list<t_vec> contour_right_top, contour_right_bottom;
+		std::pair<t_real, t_real> minmax_y_right
+			= std::make_pair(std::numeric_limits<t_real>::max(), -std::numeric_limits<t_real>::max());
 
 		for(auto iter = verts.rbegin(); iter != verts.rend(); std::advance(iter, 1))
 		{
 			const t_vec& vec = *iter;
+			if(vec[1] > std::get<1>(minmax_y_right))
+			{
+				std::get<1>(minmax_y_right) = vec[1];
+				contour_right_top.push_front(vec);
+			}
 			if(vec[1] < std::get<0>(minmax_y_right))
 			{
 				std::get<0>(minmax_y_right) = vec[1];
-				contour_right.push_front(vec);
-			}
-			else if(vec[1] > std::get<1>(minmax_y_right))
-			{
-				std::get<1>(minmax_y_right) = vec[1];
-				contour_right.push_back(vec);
+				contour_right_bottom.push_back(vec);
 			}
 		}
 
-		// convert to vector
+		// convert to vector, only insert vertex if it's different than the last one
 		verts.clear();
-		verts.reserve(contour_left.size() + contour_right.size());
-		for(const t_vec& vec : contour_left)
-			verts.push_back(vec);
-		for(auto iter = contour_right.rbegin(); iter != contour_right.rend(); std::advance(iter, 1))
-			verts.push_back(*iter);
+		verts.reserve(contour_left_top.size() + contour_right_top.size() +
+			contour_left_bottom.size() + contour_right_bottom.size());
+		for(const t_vec& vec : contour_left_top)
+			if(!m::equals<t_vec>(*verts.rbegin(), vec, eps))
+				verts.push_back(vec);
+		for(const t_vec& vec : contour_right_top)
+			if(!m::equals<t_vec>(*verts.rbegin(), vec, eps))
+				verts.push_back(vec);
+		for(const t_vec& vec : contour_right_bottom)
+			if(!m::equals<t_vec>(*verts.rbegin(), vec, eps))
+				verts.push_back(vec);
+		for(const t_vec& vec : contour_left_bottom)
+			if(!m::equals<t_vec>(*verts.rbegin(), vec, eps))
+				verts.push_back(vec);
+
+		if(verts.size() >= 2 && m::equals<t_vec>(*verts.begin(), *verts.rbegin(), eps))
+			verts.erase(std::prev(verts.end(),1));
+
+		/*
+		// remove duplicate points between both contour lines
+		verts.erase(std::unique(verts.begin(), verts.end(),
+			[eps](const t_vec& vec1, const t_vec& vec2)->bool
+			{ return m::equals<t_vec>(vec1, vec2, eps); }
+			), verts.end());
+		*/
+		/*
+		std::cout << "\nVertices:" << std::endl;
+		for(const t_vec& vec : verts)
+			std::cout << vec << std::endl;
+		*/
 	}
 
 
 	// hull calculation
-	// TODO: use circular view on vector, as beginning and end is not considered yet
-	for(std::size_t curidx = 1; curidx < verts.size()-1;)
+	circular_wrapper circularverts(verts);
+	for(std::size_t curidx = 1; curidx < verts.size()*2-1;)
 	{
 		if(curidx < 1)
 			break;
 		bool removed_points = false;
 
 		// test convexity
-		if(side_of_line(verts[curidx-1], verts[curidx+1], verts[curidx]) < 0.)
+		if(side_of_line(circularverts[curidx-1], circularverts[curidx+1], circularverts[curidx]) < 0.)
 		{
-			//std::cout << "vertex inside polygon: " << verts[curidx] << std::endl;
+			//std::cout << "vertex inside polygon: " << circularverts[curidx] << std::endl;
 			for(std::size_t lastgood = curidx; lastgood >= 1; --lastgood)
 			{
-				if(side_of_line(verts[lastgood-1], verts[lastgood], verts[curidx+1]) <= 0.)
+				if(side_of_line(circularverts[lastgood-1], circularverts[lastgood], circularverts[curidx+1]) <= 0.)
 				{
 					if(lastgood+1 > curidx+1)
 						continue;
 
-					verts.erase(std::next(verts.begin(), lastgood+1), std::next(verts.begin(), curidx+1));
+					circularverts.erase(std::next(circularverts.begin(), lastgood+1), std::next(circularverts.begin(), curidx+1));
 					curidx = lastgood;
 					removed_points = true;
 					break;
