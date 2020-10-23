@@ -126,6 +126,7 @@ class circular_wrapper
 public:
 	using iterator = circular_iterator<t_cont>;
 
+
 public:
 	circular_wrapper(t_cont& cont) : m_cont{cont}
 	{}
@@ -149,16 +150,19 @@ public:
 
 		if(idxBeg <= idxEnd)
 		{
+			// no wrapping around, simply delete range
 			auto iter = m_cont.erase(std::next(m_cont.begin(),idxBeg), std::next(m_cont.begin(),idxEnd));
-			return iterator(m_cont, iter);
+			return iterator{m_cont, iter};
 		}
 		else
 		{
+			// wrapping around, split range into two
 			m_cont.erase(std::next(m_cont.begin(),idxBeg), m_cont.end());
 			auto iter = m_cont.erase(m_cont.begin(), std::next(m_cont.begin(),idxEnd));
-			return iterator(m_cont, iter);
+			return iterator{m_cont, iter};
 		}
 	}
+
 
 private:
 	t_cont& m_cont;
@@ -166,3 +170,4 @@ private:
 
 
 #endif
+

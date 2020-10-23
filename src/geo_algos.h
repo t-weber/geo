@@ -27,6 +27,9 @@
 #include <libqhullcpp/QhullVertexSet.h>
 
 
+// ----------------------------------------------------------------------------
+// Helper functions
+// ----------------------------------------------------------------------------
 
 template<class t_vec>
 t_vec calc_circumcentre(const std::vector<t_vec>& triag)
@@ -90,6 +93,42 @@ requires m::is_vec<t_vec>
 }
 
 
+
+template<class t_vec, class t_real = typename t_vec::value_type>
+std::vector<t_vec>
+_sort_vertices(const std::vector<t_vec>& _verts, t_real eps=std::numeric_limits<t_real>::epsilon())
+requires m::is_vec<t_vec>
+{
+	std::vector<t_vec> verts = _verts;
+
+	std::stable_sort(verts.begin(), verts.end(), [eps](const t_vec& vert1, const t_vec& vert2) -> bool
+	{
+		if(m::equals<t_real>(vert1[0], vert2[0], eps))
+			return vert1[1] < vert2[1];
+		return vert1[0] < vert2[0];
+	});
+
+	// remove unnecessary points
+	auto iterCurX = verts.begin();
+	for(auto iter = iterCurX; iter != verts.end(); std::advance(iter, 1))
+	{
+		// next x?
+		if(!m::equals<t_real>((*iter)[0], (*iterCurX)[0], eps))
+		{
+			std::size_t num_same_x = iter - iterCurX;
+			if(num_same_x >= 3)
+				iter = verts.erase(std::next(iterCurX, 1), std::prev(iter, 1));
+			iterCurX = iter;
+		}
+	}
+
+	return verts;
+}
+
+// ----------------------------------------------------------------------------
+
+
+// ----------------------------------------------------------------------------
 
 template<class t_vec>
 std::vector<t_vec>
@@ -352,33 +391,13 @@ requires m::is_vec<t_vec>
 {
 	using t_real = typename t_vec::value_type;
 	t_real eps = 1e-5;
-	std::vector<t_vec> verts = _verts;
-
-	// sort
-	std::stable_sort(verts.begin(), verts.end(), [eps](const t_vec& vert1, const t_vec& vert2) -> bool
-	{
-		if(m::equals<t_real>(vert1[0], vert2[0], eps))
-			return vert1[1] < vert2[1];
-		return vert1[0] < vert2[0];
-	});
-
-	// remove unnecessary points
-	auto iterCurX = verts.begin();
-	for(auto iter = iterCurX; iter != verts.end(); std::advance(iter, 1))
-	{
-		// next x?
-		if(!m::equals<t_real>((*iter)[0], (*iterCurX)[0], eps))
-		{
-			std::size_t num_same_x = iter - iterCurX;
-			if(num_same_x >= 3)
-				iter = verts.erase(std::next(iterCurX, 1), std::prev(iter, 1));
-			iterCurX = iter;
-		}
-	}
+	std::vector<t_vec> verts = _sort_vertices<t_vec>(_verts, eps);
 
 	return _calc_hull_divide_sorted<t_vec>(verts);
 }
 
+
+// ----------------------------------------------------------------------------
 
 
 template<class t_vec>
@@ -389,32 +408,7 @@ requires m::is_vec<t_vec>
 	using namespace m_ops;
 	using t_real = typename t_vec::value_type;
 	t_real eps = 1e-5;
-	std::vector<t_vec> verts = _verts;
-
-
-	// sorting
-	{
-		std::stable_sort(verts.begin(), verts.end(), [eps](const t_vec& vert1, const t_vec& vert2) -> bool
-		{
-			if(m::equals<t_real>(vert1[0], vert2[0], eps))
-				return vert1[1] < vert2[1];
-			return vert1[0] < vert2[0];
-		});
-
-		// remove unnecessary points
-		auto iterCurX = verts.begin();
-		for(auto iter = iterCurX; iter != verts.end(); std::advance(iter, 1))
-		{
-			// next x?
-			if(!m::equals<t_real>((*iter)[0], (*iterCurX)[0], eps))
-			{
-				std::size_t num_same_x = iter - iterCurX;
-				if(num_same_x >= 3)
-					iter = verts.erase(std::next(iterCurX, 1), std::prev(iter, 1));
-				iterCurX = iter;
-			}
-		}
-	}
+	std::vector<t_vec> verts = _sort_vertices<t_vec>(_verts, eps);
 
 
 	// contour determination
@@ -526,6 +520,8 @@ requires m::is_vec<t_vec>
 	return verts;
 }
 
+
+// ----------------------------------------------------------------------------
 
 
 /**
@@ -680,6 +676,9 @@ requires m::is_vec<t_vec>
 
 	return std::make_tuple(voronoi, triags);
 }
+
+
+// ----------------------------------------------------------------------------
 
 
 #endif
