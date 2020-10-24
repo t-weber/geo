@@ -344,6 +344,9 @@ void HullView::UpdateHull()
 		case HullCalculationMethod::CONTOUR:
 			hull.emplace_back(calc_hull_contour<t_vec>(vertices));
 			break;
+		case HullCalculationMethod::INCREMENTAL:
+			hull.emplace_back(calc_hull_inc<t_vec>(vertices));
+			break;
 		case HullCalculationMethod::DIVIDE:
 			hull.emplace_back(calc_hull_divide<t_vec>(vertices));
 			break;
@@ -557,6 +560,11 @@ HullWnd::HullWnd(QWidget* pParent) : QMainWindow{pParent},
 	connect(actionHullContour, &QAction::toggled, [this]()
 		{ m_view->SetHullCalculationMethod(HullCalculationMethod::CONTOUR); });
 
+	QAction *actionHullInc = new QAction{"Incremental", this};
+	actionHullInc->setCheckable(true);
+	connect(actionHullInc, &QAction::toggled, [this]()
+	{ m_view->SetHullCalculationMethod(HullCalculationMethod::INCREMENTAL); });
+
 	QAction *actionHullDivide = new QAction{"Divide && Conquer", this};
 	actionHullDivide->setCheckable(true);
 	connect(actionHullDivide, &QAction::toggled, [this]()
@@ -578,6 +586,7 @@ HullWnd::HullWnd(QWidget* pParent) : QMainWindow{pParent},
 	QActionGroup *groupHullBack = new QActionGroup{this};
 	groupHullBack->addAction(actionHullQHull);
 	groupHullBack->addAction(actionHullContour);
+	groupHullBack->addAction(actionHullInc);
 	groupHullBack->addAction(actionHullDivide);
 
 	QActionGroup *groupDelaunayBack = new QActionGroup{this};
@@ -601,6 +610,7 @@ HullWnd::HullWnd(QWidget* pParent) : QMainWindow{pParent},
 	menuBack->addSeparator()->setText("Convex Hull");
 	menuBack->addAction(actionHullQHull);
 	menuBack->addAction(actionHullContour);
+	menuBack->addAction(actionHullInc);
 	menuBack->addAction(actionHullDivide);
 	menuBack->addSeparator()->setText("Delaunay");
 	menuBack->addAction(actionDelaunayQHull);

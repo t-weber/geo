@@ -13,12 +13,15 @@
 
 #include <vector>
 #include <list>
+#include <tuple>
 #include <algorithm>
 #include <limits>
 
 #include "math_algos.h"
 #include "math_conts.h"
 #include "helpers.h"
+
+#include <boost/intrusive/bstree.hpp>
 
 #include <libqhullcpp/Qhull.h>
 #include <libqhullcpp/QhullFacet.h>
@@ -79,7 +82,7 @@ requires m::is_vec<t_vec>
 /**
  * returns > 0 if point is on the left-hand side of line
  */
-template<class t_vec, class t_real=typename t_vec::value_type>
+template<class t_vec, class t_real = typename t_vec::value_type>
 t_real side_of_line(const t_vec& vec1a, const t_vec& vec1b, const t_vec& pt)
 requires m::is_vec<t_vec>
 {
@@ -92,6 +95,22 @@ requires m::is_vec<t_vec>
 	return dir1[0]*dir2[1] - dir1[1]*dir2[0];
 }
 
+
+template<class t_vec, class t_real = typename t_vec::value_type>
+std::vector<t_vec>
+_remove_duplicates(const std::vector<t_vec>& _verts, t_real eps=std::numeric_limits<t_real>::epsilon())
+requires m::is_vec<t_vec>
+{
+	std::vector<t_vec> verts = _verts;
+
+	// remove duplicate points
+	verts.erase(std::unique(verts.begin(), verts.end(),
+		[eps](const t_vec& vec1, const t_vec& vec2)->bool
+		{ return m::equals<t_vec>(vec1, vec2, eps); }
+		), verts.end());
+
+	return verts;
+}
 
 
 template<class t_vec, class t_real = typename t_vec::value_type>
@@ -125,36 +144,44 @@ requires m::is_vec<t_vec>
 	return verts;
 }
 
+
+template<class t_vec, class t_real = typename t_vec::value_type>
+std::tuple<std::vector<t_vec>, t_vec>
+_sort_vertices_by_angle(const std::vector<t_vec>& _verts)
+requires m::is_vec<t_vec>
+{
+	std::vector<t_vec> verts = _verts;
+	//verts = _remove_duplicates<t_vec>(verts, eps);
+
+	// sort by angle
+	t_vec mean = std::accumulate(verts.begin(), verts.end(), m::zero<t_vec>(2));
+	mean /= t_real(verts.size());
+	std::stable_sort(verts.begin(), verts.end(), [&mean](const t_vec& vec1, const t_vec& vec2)->bool
+	{ return line_angle<t_vec>(mean, vec1) < line_angle<t_vec>(mean, vec2); });
+
+	return std::make_tuple(verts, mean);
+}
+
 // ----------------------------------------------------------------------------
 
 
 // ----------------------------------------------------------------------------
 
-template<class t_vec>
+template<class t_vec, class t_real = typename t_vec::value_type>
 std::vector<t_vec>
-_calc_hull_divide_sorted(const std::vector<t_vec>& verts)
+_calc_hull_divide_sorted(const std::vector<t_vec>& verts, t_real eps = 1e-5)
 requires m::is_vec<t_vec>
 {
 	using namespace m_ops;
-	using t_real = typename t_vec::value_type;
-	t_real eps = 1e-5;
 
 	// trivial cases to end recursion
 	if(verts.size() <= 3)
 	{
 		std::vector<t_vec> hullverts;
-		t_vec mean = m::zero<t_vec>(2);
 		for(std::size_t vertidx=0; vertidx<verts.size(); ++vertidx)
-		{
-			mean += verts[vertidx];
 			hullverts.push_back(verts[vertidx]);
-		}
-		mean /= t_real(verts.size());
 
-		std::stable_sort(hullverts.begin(), hullverts.end(), [&mean](const t_vec& vec1, const t_vec& vec2)->bool
-		{ return line_angle<t_vec>(mean, vec1) < line_angle<t_vec>(mean, vec2); });
-
-		return hullverts;
+		return std::get<0>(_sort_vertices_by_angle<t_vec>(hullverts));
 	}
 
 	// divide
@@ -373,24 +400,16 @@ requires m::is_vec<t_vec>
 	}
 
 	hullLeft.insert(hullLeft.end(), hullRight.begin(), hullRight.end());
-
-	t_vec mean = std::accumulate(hullLeft.begin(), hullLeft.end(), m::zero<t_vec>(2));
-	mean /= t_real(hullLeft.size());
-	std::stable_sort(hullLeft.begin(), hullLeft.end(), [&mean](const t_vec& vec1, const t_vec& vec2)->bool
-	{ return line_angle<t_vec>(mean, vec1) < line_angle<t_vec>(mean, vec2); });
-
-	return hullLeft;
+	return std::get<0>(_sort_vertices_by_angle<t_vec>(hullLeft));
 }
 
 
 
-template<class t_vec>
+template<class t_vec, class t_real = typename t_vec::value_type>
 std::vector<t_vec>
-calc_hull_divide(const std::vector<t_vec>& _verts)
+calc_hull_divide(const std::vector<t_vec>& _verts, t_real eps = 1e-5)
 requires m::is_vec<t_vec>
 {
-	using t_real = typename t_vec::value_type;
-	t_real eps = 1e-5;
 	std::vector<t_vec> verts = _sort_vertices<t_vec>(_verts, eps);
 
 	return _calc_hull_divide_sorted<t_vec>(verts);
@@ -400,14 +419,118 @@ requires m::is_vec<t_vec>
 // ----------------------------------------------------------------------------
 
 
-template<class t_vec>
+template<class t_hook, class t_real>
+struct t_leaf
+{
+	t_real val{};
+	t_hook _h{};
+
+	friend bool operator<(const t_leaf<t_hook, t_real>& e1, const t_leaf<t_hook, t_real>& e2)
+	{ return e1.val < e2.val; }
+};
+
+
+template<class t_vec, class t_real = typename t_vec::value_type>
 std::vector<t_vec>
-calc_hull_contour(const std::vector<t_vec>& _verts)
+calc_hull_inc(const std::vector<t_vec>& _verts, t_real eps = 1e-5)
 requires m::is_vec<t_vec>
 {
 	using namespace m_ops;
-	using t_real = typename t_vec::value_type;
-	t_real eps = 1e-5;
+
+	// ------------------------------------------------------------------------
+	// binary search tree
+	namespace intr = boost::intrusive;
+
+	using t_bsleaf = t_leaf<intr::bs_set_member_hook<intr::link_mode<intr::normal_link>>, t_real>;
+	using t_bs = intr::bstree<t_bsleaf, intr::member_hook<t_bsleaf, decltype(t_bsleaf::_h), &t_bsleaf::_h>>;
+	// ------------------------------------------------------------------------
+
+	std::vector<t_vec> verts = _remove_duplicates<t_vec>(_verts, eps);
+
+	if(verts.size() <= 3)
+		return verts;
+
+	std::vector<t_vec> hull = {{ verts[0], verts[1], verts[2] }};
+	t_vec vert_in_hull = m::zero<t_vec>(2);
+	std::tie(hull, vert_in_hull) = _sort_vertices_by_angle<t_vec>(hull);
+
+	/*std::cout << "hull:" << std::endl;
+	for(const t_vec& vec : hull)
+		std::cout << vec << std::endl;*/
+
+
+	// test if the vertex is already in the hull
+	auto is_in_hull = [&hull, &vert_in_hull](const t_vec& newvert) -> std::tuple<bool, std::size_t, std::size_t>
+	{
+		for(std::size_t hullvertidx1=0; hullvertidx1<hull.size(); ++hullvertidx1)
+		{
+			std::size_t hullvertidx2 = hullvertidx1+1;
+			if(hullvertidx2 >= hull.size())
+				hullvertidx2 = 0;
+
+			const t_vec& hullvert1 = hull[hullvertidx1];
+			const t_vec& hullvert2 = hull[hullvertidx2];
+
+			// new vertex is between these two points
+			if(side_of_line<t_vec>(vert_in_hull, hullvert1, newvert) > 0. &&
+				side_of_line<t_vec>(vert_in_hull, hullvert2, newvert) <= 0.)
+			{
+				// outside hull?
+				if(side_of_line<t_vec>(hullvert1, hullvert2, newvert) < 0.)
+					return std::make_tuple(false, hullvertidx1, hullvertidx2);
+			}
+		}
+		return std::make_tuple(true, 0, 0);
+	};
+
+
+	// insert new vertex into hull
+	for(std::size_t vertidx=3; vertidx<verts.size(); ++vertidx)
+	{
+		const t_vec& newvert = verts[vertidx];
+		auto [already_in_hull, hullvertidx1, hullvertidx2] = is_in_hull(newvert);
+		if(already_in_hull)
+			continue;
+
+		circular_wrapper circularverts(hull);
+		auto iterLower = circularverts.begin()+hullvertidx1;
+		auto iterUpper = circularverts.begin()+hullvertidx2;
+
+		// correct cycles
+		if(hullvertidx1 > hullvertidx2 && iterLower.GetRound()==iterUpper.GetRound())
+			iterUpper.SetRound(iterLower.GetRound()+1);
+
+		for(; iterLower.GetRound()>=-2; --iterLower)
+		{
+			if(side_of_line<t_vec>(*iterLower, newvert, *(iterLower-1)) >= 0.)
+				break;
+		}
+
+		for(; iterUpper.GetRound()<=2; ++iterUpper)
+		{
+			if(side_of_line<t_vec>(*iterUpper, newvert, *(iterUpper+1)) <= 0.)
+				break;
+		}
+
+		auto iter = iterUpper;
+		if(iterLower+1 < iterUpper)
+			iter = circularverts.erase(iterLower+1, iterUpper);
+		hull.insert(iter.GetIter(), newvert);
+	}
+
+	return hull;
+}
+
+
+// ----------------------------------------------------------------------------
+
+
+template<class t_vec, class t_real = typename t_vec::value_type>
+std::vector<t_vec>
+calc_hull_contour(const std::vector<t_vec>& _verts, t_real eps = 1e-5)
+requires m::is_vec<t_vec>
+{
+	using namespace m_ops;
 	std::vector<t_vec> verts = _sort_vertices<t_vec>(_verts, eps);
 
 
@@ -472,13 +595,6 @@ requires m::is_vec<t_vec>
 			verts.erase(std::prev(verts.end(),1));
 
 		/*
-		// remove duplicate points between both contour lines
-		verts.erase(std::unique(verts.begin(), verts.end(),
-			[eps](const t_vec& vec1, const t_vec& vec2)->bool
-			{ return m::equals<t_vec>(vec1, vec2, eps); }
-			), verts.end());
-		*/
-		/*
 		std::cout << "\nVertices:" << std::endl;
 		for(const t_vec& vec : verts)
 			std::cout << vec << std::endl;
@@ -495,12 +611,12 @@ requires m::is_vec<t_vec>
 		bool removed_points = false;
 
 		// test convexity
-		if(side_of_line(circularverts[curidx-1], circularverts[curidx+1], circularverts[curidx]) < 0.)
+		if(side_of_line<t_vec>(circularverts[curidx-1], circularverts[curidx+1], circularverts[curidx]) < 0.)
 		{
 			//std::cout << "vertex inside polygon: " << circularverts[curidx] << std::endl;
 			for(std::size_t lastgood = curidx; lastgood >= 1; --lastgood)
 			{
-				if(side_of_line(circularverts[lastgood-1], circularverts[lastgood], circularverts[curidx+1]) <= 0.)
+				if(side_of_line<t_vec>(circularverts[lastgood-1], circularverts[lastgood], circularverts[curidx+1]) <= 0.)
 				{
 					if(lastgood+1 > curidx+1)
 						continue;
