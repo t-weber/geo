@@ -194,209 +194,93 @@ requires m::is_vec<t_vec>
 	// recurse
 	std::vector<t_vec> hullLeft = _calc_hull_divide_sorted(vertsLeft);
 	std::vector<t_vec> hullRight = _calc_hull_divide_sorted(vertsRight);
-	//std::cout << "left size: " << hullLeft.size() << ", right size: " << hullRight.size() << std::endl;
 
-	if(hullLeft.size() == 0) return hullRight;
-	if(hullRight.size() == 0) return hullLeft;
 
 	// merge
-	bool leftStayedOnStart=true, rightStayedOnStart=true;
 	// upper part
+	bool leftIsOnMax=false, rightIsOnMin=false;
 	{
-		auto iterLeftMax = std::max_element(hullLeft.begin(), hullLeft.end(), [](const t_vec& vec1, const t_vec& vec2)->bool
+		auto _iterLeftMax = std::max_element(hullLeft.begin(), hullLeft.end(), [](const t_vec& vec1, const t_vec& vec2)->bool
 		{ return vec1[0] < vec2[0]; });
-		auto iterRightMin = std::min_element(hullRight.rbegin(), hullRight.rend(), [](const t_vec& vec1, const t_vec& vec2)->bool
+		auto _iterRightMin = std::min_element(hullRight.begin(), hullRight.end(), [](const t_vec& vec1, const t_vec& vec2)->bool
 		{ return vec1[0] < vec2[0]; });
 
-		std::rotate(hullLeft.begin(), iterLeftMax, hullLeft.end());
-		std::rotate(hullRight.rbegin(), iterRightMin, hullRight.rend());
+		circular_wrapper circhullLeft(hullLeft);
+		circular_wrapper circhullRight(hullRight);
+		auto iterLeftMax = circhullLeft.begin() + (_iterLeftMax-hullLeft.begin());
+		auto iterRightMin = circhullRight.begin() + (_iterRightMin-hullRight.begin());
 
-		auto iterLeft = hullLeft.begin();
-		auto iterRight = hullRight.rbegin();
-		bool leftFound=false, rightFound=false;
-		bool leftNeedsUpdate=false, rightNeedsUpdate=false;
-
-		std::cout << "step 1: starting points: " << *iterLeft << " and " << *iterRight << "." << std::endl;
+		auto iterLeft = iterLeftMax;
+		auto iterRight = iterRightMin;
 
 		while(true)
 		{
-			if(!leftFound || leftNeedsUpdate)
-			{
-				leftNeedsUpdate = false;
+			bool leftChanged = false;
+			bool rightChanged = false;
 
-				auto iterLeftNext = std::next(iterLeft, 1);
-				if(iterLeftNext == hullLeft.end())
-					leftFound = true;
-				else
-				{
-					if(side_of_line(*iterLeft, *iterRight, *iterLeftNext) < 0.)
-					{
-						leftFound = true;
-					}
-					else
-					{
-						iterLeft = iterLeftNext;
-						rightNeedsUpdate = true;
-					}
-				}
+			while(side_of_line<t_vec>(*iterLeft, *iterRight, *(iterLeft+1)) > 0.)
+			{
+				++iterLeft;
+				leftChanged = true;
+			}
+			while(side_of_line<t_vec>(*iterLeft, *iterRight, *(iterRight-1)) > 0.)
+			{
+				--iterRight;
+				rightChanged = true;
 			}
 
-			if(!rightFound || rightNeedsUpdate)
-			{
-				rightNeedsUpdate = false;
-
-				auto iterRightNext = std::next(iterRight, 1);
-				if(iterRightNext == hullRight.rend())
-					rightFound = true;
-				else
-				{
-					if(side_of_line(*iterLeft, *iterRight, *iterRightNext) < 0.)
-					{
-						rightFound = true;
-					}
-					else
-					{
-						iterRight = iterRightNext;
-						leftNeedsUpdate = true;
-					}
-				}
-			}
-
-			if(leftFound && rightFound && !leftNeedsUpdate && !rightNeedsUpdate)
+			// no more changes
+			if(!leftChanged && !rightChanged)
 				break;
 		}
 
-		leftStayedOnStart = (iterLeft == hullLeft.begin());
-		rightStayedOnStart = (iterRight == hullRight.rbegin());
+		if(iterLeft == iterLeftMax)
+			leftIsOnMax = true;
+		if(iterRight == iterRightMin)
+			rightIsOnMin = true;
 
-		std::cout << "step 1: final points: " << *iterLeft << " and " << *iterRight << "." << std::endl;
-
-		std::size_t sizeLeftOrg = hullLeft.size();
-		std::size_t sizeRightOrg = hullRight.size();
-
-		auto iterLeftStart = std::next(hullLeft.begin(), 1);
-		auto iterLeftEnd = iterLeft;
-		if(iterLeftStart < iterLeftEnd)
-			hullLeft.erase(iterLeftStart, iterLeftEnd);
-
-		auto iterRightStart = iterRight.base();
-		auto iterRightEnd = std::next(hullRight.rbegin(), 1).base();
-		if(iterRightStart < iterRightEnd)
-			hullRight.erase(iterRightStart, iterRightEnd);
-
-		std::cout << "step 1: erased " << sizeLeftOrg-hullLeft.size() << " and " << sizeRightOrg-hullRight.size() << "." << std::endl;
-		/*
-		std::cout << "left hull: ";
-		for(const t_vec& vec : hullLeft)
-			std::cout << vec << ",  ";
-		std::cout << std::endl;
-
-		std::cout << "right hull: ";
-		for(const t_vec& vec : hullRight)
-			std::cout << vec << ",  ";
-		std::cout << std::endl;
-		*/
+		circhullLeft.erase(iterLeftMax+1, iterLeft);
+		circhullRight.erase(iterRight+1, iterRightMin);
 	}
-
-	if(hullLeft.size() == 0) return hullRight;
-	if(hullRight.size() == 0) return hullLeft;
 
 	// lower part
 	{
-		auto iterLeftMax = std::max_element(hullLeft.rbegin(), hullLeft.rend(), [](const t_vec& vec1, const t_vec& vec2)->bool
+		auto _iterLeftMax = std::max_element(hullLeft.begin(), hullLeft.end(), [](const t_vec& vec1, const t_vec& vec2)->bool
 		{ return vec1[0] < vec2[0]; });
-		auto iterRightMin = std::min_element(hullRight.begin(), hullRight.end(), [](const t_vec& vec1, const t_vec& vec2)->bool
+		auto _iterRightMin = std::min_element(hullRight.begin(), hullRight.end(), [](const t_vec& vec1, const t_vec& vec2)->bool
 		{ return vec1[0] < vec2[0]; });
 
-		std::rotate(hullLeft.rbegin(), iterLeftMax, hullLeft.rend());
-		std::rotate(hullRight.begin(), iterRightMin, hullRight.end());
-		//std::rotate(hullLeft.begin(), std::next(hullLeft.begin(),1), hullLeft.end());
-		//std::rotate(hullRight.begin(), std::prev(hullRight.end(),1), hullRight.end());
+		circular_wrapper circhullLeft(hullLeft);
+		circular_wrapper circhullRight(hullRight);
+		auto iterLeftMax = circhullLeft.begin() + (_iterLeftMax-hullLeft.begin());
+		auto iterRightMin = circhullRight.begin() + (_iterRightMin-hullRight.begin());
 
-		auto iterLeft = hullLeft.rbegin();
-		auto iterRight = hullRight.begin();
-		bool leftFound=false, rightFound=false;
-		bool leftNeedsUpdate=false, rightNeedsUpdate=false;
-
-		std::cout << "step 2: starting points: " << *iterLeft << " and " << *iterRight << "." << std::endl;
+		auto iterLeft = iterLeftMax;
+		auto iterRight = iterRightMin;
 
 		while(true)
 		{
-			if(!leftFound || leftNeedsUpdate)
-			{
-				leftNeedsUpdate = false;
+			bool leftChanged = false;
+			bool rightChanged = false;
 
-				auto iterLeftNext = std::next(iterLeft, 1);
-				if(iterLeftNext == hullLeft.rend())
-					leftFound = true;
-				else
-				{
-					if(side_of_line(*iterLeft, *iterRight, *iterLeftNext) > 0.)
-					{
-						leftFound = true;
-					}
-					else
-					{
-						iterLeft = iterLeftNext;
-						rightNeedsUpdate = true;
-					}
-				}
+			while(side_of_line<t_vec>(*iterLeft, *iterRight, *(iterLeft-1)) < 0.)
+			{
+				--iterLeft;
+				leftChanged = true;
+			}
+			while(side_of_line<t_vec>(*iterLeft, *iterRight, *(iterRight+1)) < 0.)
+			{
+				++iterRight;
+				rightChanged = true;
 			}
 
-			if(!rightFound || rightNeedsUpdate)
-			{
-				rightNeedsUpdate = false;
-
-				auto iterRightNext = std::next(iterRight, 1);
-				if(iterRightNext == hullRight.end())
-					rightFound = true;
-				else
-				{
-					if(side_of_line(*iterLeft, *iterRight, *iterRightNext) > 0.)
-					{
-						rightFound = true;
-					}
-					else
-					{
-						iterRight = iterRightNext;
-						leftNeedsUpdate = true;
-					}
-				}
-			}
-
-			if(leftFound && rightFound && !leftNeedsUpdate && !rightNeedsUpdate)
+			// no more changes
+			if(!leftChanged && !rightChanged)
 				break;
 		}
 
-		std::cout << "step 2: final points: " << *iterLeft << " and " << *iterRight << "." << std::endl;
-
-		std::size_t sizeLeftOrg = hullLeft.size();
-		std::size_t sizeRightOrg = hullRight.size();
-
-		auto iterLeftStart = iterLeft.base();
-		if(leftStayedOnStart) std::advance(iterLeftStart, 1);
-		auto iterLeftEnd = hullLeft.rbegin().base();
-		if(iterLeftStart < iterLeftEnd)
-			hullLeft.erase(iterLeftStart, iterLeftEnd);
-
-		auto iterRightStart = hullRight.begin();
-		if(rightStayedOnStart) std::advance(iterRightStart, 1);
-		auto iterRightEnd = iterRight;
-		if(iterRightStart < iterRightEnd)
-			hullRight.erase(iterRightStart, iterRightEnd);
-
-		std::cout << "step 2: erased " << sizeLeftOrg-hullLeft.size() << " and " << sizeRightOrg-hullRight.size() << "." << std::endl;
-		/*
-		std::cout << "left hull: ";
-		for(const t_vec& vec : hullLeft)
-			std::cout << vec << ",  ";
-		std::cout << std::endl;
-
-		std::cout << "right hull: ";
-		for(const t_vec& vec : hullRight)
-			std::cout << vec << ",  ";
-		std::cout << std::endl;
-		*/
+		circhullLeft.erase(iterLeft+1, leftIsOnMax ? iterLeftMax : iterLeftMax+1);
+		circhullRight.erase(rightIsOnMin ? iterRightMin+1 : iterRightMin, iterRight);
 	}
 
 	hullLeft.insert(hullLeft.end(), hullRight.begin(), hullRight.end());
