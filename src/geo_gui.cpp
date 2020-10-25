@@ -344,11 +344,12 @@ void HullView::UpdateHull()
 		case HullCalculationMethod::CONTOUR:
 			hull.emplace_back(calc_hull_contour<t_vec>(vertices));
 			break;
-		case HullCalculationMethod::INCREMENTAL:
-			hull.emplace_back(calc_hull_inc<t_vec>(vertices));
+		case HullCalculationMethod::ITERATIVE:
+			hull.emplace_back(calc_hull_iterative<t_vec>(vertices));
+			//hull.emplace_back(calc_hull_iterative_bintree<t_vec>(vertices));
 			break;
-		case HullCalculationMethod::DIVIDE:
-			hull.emplace_back(calc_hull_divide<t_vec>(vertices));
+		case HullCalculationMethod::RECURSIVE:
+			hull.emplace_back(calc_hull_recursive<t_vec>(vertices));
 			break;
 		default:
 			QMessageBox::critical(this, "Error", "Unknown hull calculation method.");
@@ -563,12 +564,12 @@ HullWnd::HullWnd(QWidget* pParent) : QMainWindow{pParent},
 	QAction *actionHullInc = new QAction{"Incremental", this};
 	actionHullInc->setCheckable(true);
 	connect(actionHullInc, &QAction::toggled, [this]()
-	{ m_view->SetHullCalculationMethod(HullCalculationMethod::INCREMENTAL); });
+	{ m_view->SetHullCalculationMethod(HullCalculationMethod::ITERATIVE); });
 
 	QAction *actionHullDivide = new QAction{"Divide && Conquer", this};
 	actionHullDivide->setCheckable(true);
 	connect(actionHullDivide, &QAction::toggled, [this]()
-		{ m_view->SetHullCalculationMethod(HullCalculationMethod::DIVIDE); });
+		{ m_view->SetHullCalculationMethod(HullCalculationMethod::RECURSIVE); });
 
 
 	QAction *actionDelaunayQHull = new QAction{"QHull", this};

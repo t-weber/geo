@@ -169,7 +169,7 @@ requires m::is_vec<t_vec>
 
 template<class t_vec, class t_real = typename t_vec::value_type>
 std::vector<t_vec>
-_calc_hull_divide_sorted(const std::vector<t_vec>& verts, t_real eps = 1e-5)
+_calc_hull_recursive_sorted(const std::vector<t_vec>& verts, t_real eps = 1e-5)
 requires m::is_vec<t_vec>
 {
 	using namespace m_ops;
@@ -192,8 +192,8 @@ requires m::is_vec<t_vec>
 	std::vector<t_vec> vertsRight(std::next(verts.begin(), div), verts.end());
 
 	// recurse
-	std::vector<t_vec> hullLeft = _calc_hull_divide_sorted(vertsLeft);
-	std::vector<t_vec> hullRight = _calc_hull_divide_sorted(vertsRight);
+	std::vector<t_vec> hullLeft = _calc_hull_recursive_sorted(vertsLeft);
+	std::vector<t_vec> hullRight = _calc_hull_recursive_sorted(vertsRight);
 
 
 	// merge
@@ -291,43 +291,24 @@ requires m::is_vec<t_vec>
 
 template<class t_vec, class t_real = typename t_vec::value_type>
 std::vector<t_vec>
-calc_hull_divide(const std::vector<t_vec>& _verts, t_real eps = 1e-5)
+calc_hull_recursive(const std::vector<t_vec>& _verts, t_real eps = 1e-5)
 requires m::is_vec<t_vec>
 {
 	std::vector<t_vec> verts = _sort_vertices<t_vec>(_verts, eps);
 
-	return _calc_hull_divide_sorted<t_vec>(verts);
+	return _calc_hull_recursive_sorted<t_vec>(verts);
 }
 
 
 // ----------------------------------------------------------------------------
 
 
-template<class t_hook, class t_real>
-struct t_leaf
-{
-	t_real val{};
-	t_hook _h{};
-
-	friend bool operator<(const t_leaf<t_hook, t_real>& e1, const t_leaf<t_hook, t_real>& e2)
-	{ return e1.val < e2.val; }
-};
-
-
 template<class t_vec, class t_real = typename t_vec::value_type>
 std::vector<t_vec>
-calc_hull_inc(const std::vector<t_vec>& _verts, t_real eps = 1e-5)
+calc_hull_iterative(const std::vector<t_vec>& _verts, t_real eps = 1e-5)
 requires m::is_vec<t_vec>
 {
 	using namespace m_ops;
-
-	// ------------------------------------------------------------------------
-	// binary search tree
-	namespace intr = boost::intrusive;
-
-	using t_bsleaf = t_leaf<intr::bs_set_member_hook<intr::link_mode<intr::normal_link>>, t_real>;
-	using t_bs = intr::bstree<t_bsleaf, intr::member_hook<t_bsleaf, decltype(t_bsleaf::_h), &t_bsleaf::_h>>;
-	// ------------------------------------------------------------------------
 
 	std::vector<t_vec> verts = _remove_duplicates<t_vec>(_verts, eps);
 
@@ -337,10 +318,6 @@ requires m::is_vec<t_vec>
 	std::vector<t_vec> hull = {{ verts[0], verts[1], verts[2] }};
 	t_vec vert_in_hull = m::zero<t_vec>(2);
 	std::tie(hull, vert_in_hull) = _sort_vertices_by_angle<t_vec>(hull);
-
-	/*std::cout << "hull:" << std::endl;
-	for(const t_vec& vec : hull)
-		std::cout << vec << std::endl;*/
 
 
 	// test if the vertex is already in the hull
@@ -403,6 +380,125 @@ requires m::is_vec<t_vec>
 	}
 
 	return hull;
+}
+
+
+// TODO
+template<class t_vec, class t_real = typename t_vec::value_type>
+std::vector<t_vec>
+calc_hull_iterative_bintree(const std::vector<t_vec>& _verts, t_real eps = 1e-5)
+requires m::is_vec<t_vec>
+{
+	using namespace m_ops;
+
+	// ------------------------------------------------------------------------
+	// binary search tree
+	namespace intr = boost::intrusive;
+
+	using t_hook = intr::bs_set_member_hook<intr::link_mode<intr::normal_link>>;
+
+	struct t_node
+	{
+		t_vec vert;
+		t_real angle{};
+		t_hook _h{};
+
+		t_node(const t_vec& center, const t_vec& vert)
+			: vert{vert}, angle{line_angle<t_vec>(center, vert)}
+		{}
+
+		bool operator<(const t_node& e2) const
+		{ return this->angle < e2.angle; }
+	};
+
+	using t_tree = intr::bstree<t_node, intr::member_hook<t_node, decltype(t_node::_h), &t_node::_h>>;
+	t_tree hull;
+	// ------------------------------------------------------------------------
+
+	std::vector<t_vec> verts = _remove_duplicates<t_vec>(_verts, eps);
+
+	if(verts.size() <= 3)
+		return verts;
+
+	std::vector<t_vec> starthull = {{ verts[0], verts[1], verts[2] }};
+	t_vec vert_in_hull = std::accumulate(starthull.begin(), starthull.end(), m::zero<t_vec>(2));
+	vert_in_hull /= t_real(starthull.size());
+
+	hull.insert_equal(*new t_node(vert_in_hull, verts[0]));
+	hull.insert_equal(*new t_node(vert_in_hull, verts[1]));
+	hull.insert_equal(*new t_node(vert_in_hull, verts[2]));
+
+
+	// test if the vertex is already in the hull
+	auto is_in_hull = [&vert_in_hull, &hull](const t_vec& newvert) -> std::tuple<bool, std::size_t, std::size_t>
+	{
+		t_node tosearch(vert_in_hull, newvert);
+		auto iter2 = hull.upper_bound(tosearch);
+		// wrap around
+		if(iter2 == hull.end())
+			iter2 = hull.begin();
+
+		auto iter1 = (iter2==hull.begin() ? std::next(hull.rbegin(),1).base() : std::prev(iter2,1));
+
+		/*if(tosearch.angle < iter1->angle || tosearch.angle > iter2->angle)
+			std::cerr << "angle: " << tosearch.angle/M_PI*180. << ", line1: " << iter1->angle/M_PI*180. << ", line2: " << iter2->angle/M_PI*180. << std::endl;*/
+
+		const t_vec& vert1 = iter1->vert;
+		const t_vec& vert2 = iter2->vert;
+
+		// outside hull?
+		if(side_of_line<t_vec>(vert1, vert2, newvert) < 0.)
+		{
+			std::size_t vertidx1 = std::distance(hull.begin(), iter1);
+			std::size_t vertidx2 = std::distance(hull.begin(), iter2);
+
+			return std::make_tuple(false, vertidx1, vertidx2);
+		}
+
+		return std::make_tuple(true, 0, 0);
+	};
+
+
+	// insert new vertex into hull
+	for(std::size_t vertidx=3; vertidx<verts.size(); ++vertidx)
+	{
+		const t_vec& newvert = verts[vertidx];
+		auto [already_in_hull, hullvertidx1, hullvertidx2] = is_in_hull(newvert);
+		if(already_in_hull)
+			continue;
+
+		circular_wrapper circularverts(hull);
+		auto iterLower = circularverts.begin()+hullvertidx1;
+		auto iterUpper = circularverts.begin()+hullvertidx2;
+
+		// correct cycles
+		if(hullvertidx1 > hullvertidx2 && iterLower.GetRound()==iterUpper.GetRound())
+			iterUpper.SetRound(iterLower.GetRound()+1);
+
+		for(; iterLower.GetRound()>=-2; --iterLower)
+		{
+			if(side_of_line<t_vec>(iterLower->vert, newvert, (iterLower-1)->vert) >= 0.)
+				break;
+		}
+
+		for(; iterUpper.GetRound()<=2; ++iterUpper)
+		{
+			if(side_of_line<t_vec>(iterUpper->vert, newvert, (iterUpper+1)->vert) <= 0.)
+				break;
+		}
+
+		auto iter = iterUpper;
+		if(std::distance(iterLower+1, iterUpper) < 0)
+			iter = circularverts.erase(iterLower+1, iterUpper);
+
+		hull.insert_equal(iter.GetIter(), *new t_node(vert_in_hull, newvert));
+	}
+
+
+	std::vector<t_vec> finalhull;
+	for(const auto& node : hull)
+		finalhull.push_back(node.vert);
+	return finalhull;
 }
 
 
@@ -477,12 +573,6 @@ requires m::is_vec<t_vec>
 
 		if(verts.size() >= 2 && m::equals<t_vec>(*verts.begin(), *verts.rbegin(), eps))
 			verts.erase(std::prev(verts.end(),1));
-
-		/*
-		std::cout << "\nVertices:" << std::endl;
-		for(const t_vec& vec : verts)
-			std::cout << vec << std::endl;
-		*/
 	}
 
 

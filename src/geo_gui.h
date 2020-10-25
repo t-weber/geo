@@ -39,8 +39,8 @@ enum class HullCalculationMethod
 {
 	QHULL,
 	CONTOUR,
-	INCREMENTAL,
-	DIVIDE,
+	ITERATIVE,
+	RECURSIVE,
 };
 
 
