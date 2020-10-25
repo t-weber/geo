@@ -1,0 +1,2 @@
+# geo
+Basic geometry algorithms.
