@@ -383,37 +383,13 @@ requires m::is_vec<t_vec>
 }
 
 
-// TODO
 template<class t_vec, class t_real = typename t_vec::value_type>
 std::vector<t_vec>
 calc_hull_iterative_bintree(const std::vector<t_vec>& _verts, t_real eps = 1e-5)
 requires m::is_vec<t_vec>
 {
 	using namespace m_ops;
-
-	// ------------------------------------------------------------------------
-	// binary search tree
 	namespace intr = boost::intrusive;
-
-	using t_hook = intr::bs_set_member_hook<intr::link_mode<intr::normal_link>>;
-
-	struct t_node
-	{
-		t_vec vert;
-		t_real angle{};
-		t_hook _h{};
-
-		t_node(const t_vec& center, const t_vec& vert)
-			: vert{vert}, angle{line_angle<t_vec>(center, vert)}
-		{}
-
-		bool operator<(const t_node& e2) const
-		{ return this->angle < e2.angle; }
-	};
-
-	using t_tree = intr::bstree<t_node, intr::member_hook<t_node, decltype(t_node::_h), &t_node::_h>>;
-	t_tree hull;
-	// ------------------------------------------------------------------------
 
 	std::vector<t_vec> verts = _remove_duplicates<t_vec>(_verts, eps);
 
@@ -424,9 +400,34 @@ requires m::is_vec<t_vec>
 	t_vec vert_in_hull = std::accumulate(starthull.begin(), starthull.end(), m::zero<t_vec>(2));
 	vert_in_hull /= t_real(starthull.size());
 
-	hull.insert_equal(*new t_node(vert_in_hull, verts[0]));
-	hull.insert_equal(*new t_node(vert_in_hull, verts[1]));
-	hull.insert_equal(*new t_node(vert_in_hull, verts[2]));
+
+	using t_hook = intr::bs_set_member_hook<intr::link_mode<intr::normal_link>>;
+
+	struct t_node
+	{
+		t_vec vert;
+		t_real angle{};
+		t_hook _h{};
+
+		t_node(const t_vec& center, const t_vec& vert) : vert{vert}, angle{line_angle<t_vec>(center, vert)}
+		{}
+
+		bool operator<(const t_node& e2) const
+		{
+			return this->angle < e2.angle;
+		}
+	};
+
+	using t_tree = intr::bstree<t_node, intr::member_hook<t_node, decltype(t_node::_h), &t_node::_h>>;
+	t_tree hull;
+	std::vector<t_node*> node_mem {{
+		new t_node(vert_in_hull, verts[0]),
+		new t_node(vert_in_hull, verts[1]),
+		new t_node(vert_in_hull, verts[2]),
+	}};
+
+	for(t_node* node : node_mem)
+		hull.insert_equal(*node);
 
 
 	// test if the vertex is already in the hull
@@ -488,16 +489,28 @@ requires m::is_vec<t_vec>
 		}
 
 		auto iter = iterUpper;
-		if(std::distance(iterLower+1, iterUpper) < 0)
+		if(std::distance(iterLower+1, iterUpper) > 0)
 			iter = circularverts.erase(iterLower+1, iterUpper);
 
-		hull.insert_equal(iter.GetIter(), *new t_node(vert_in_hull, newvert));
+		t_node* newnode = new t_node(vert_in_hull, newvert);
+		node_mem.push_back(newnode);
+		hull.insert_equal(iter.GetIter(), *newnode);
 	}
 
 
+	// cleanups
 	std::vector<t_vec> finalhull;
-	for(const auto& node : hull)
-		finalhull.push_back(node.vert);
+	for(auto iter = hull.begin(); iter != hull.end();)
+	{
+		finalhull.push_back(iter->vert);
+		//t_node* node = &*iter;
+		iter = hull.erase(iter);
+		//delete node;
+	}
+
+	for(t_node* node : node_mem)
+		delete node;
+
 	return finalhull;
 }
 

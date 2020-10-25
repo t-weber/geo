@@ -345,8 +345,8 @@ void HullView::UpdateHull()
 			hull.emplace_back(calc_hull_contour<t_vec>(vertices));
 			break;
 		case HullCalculationMethod::ITERATIVE:
-			hull.emplace_back(calc_hull_iterative<t_vec>(vertices));
-			//hull.emplace_back(calc_hull_iterative_bintree<t_vec>(vertices));
+			//hull.emplace_back(calc_hull_iterative<t_vec>(vertices));
+			hull.emplace_back(calc_hull_iterative_bintree<t_vec>(vertices));
 			break;
 		case HullCalculationMethod::RECURSIVE:
 			hull.emplace_back(calc_hull_recursive<t_vec>(vertices));

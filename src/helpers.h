@@ -196,14 +196,14 @@ public:
 		if(idxBeg <= idxEnd && begin.GetRound() == end.GetRound())
 		{
 			// no wrapping around, simply delete range
-			auto iter = m_cont->erase(std::next(m_cont->begin(),idxBeg), std::next(m_cont->begin(),idxEnd));
+			auto iter = m_cont->erase(std::next(m_cont->begin(),idxBeg), std::next(m_cont->begin(), idxEnd));
 			return iterator{m_cont, iter};
 		}
 		else if(idxBeg > idxEnd && end.GetRound() > begin.GetRound())
 		{
 			// wrapping around, split range into two
 			m_cont->erase(std::next(m_cont->begin(),idxBeg), m_cont->end());
-			auto iter = m_cont->erase(m_cont->begin(), std::next(m_cont->begin(),idxEnd));
+			auto iter = m_cont->erase(m_cont->begin(), std::next(m_cont->begin(), idxEnd));
 			return iterator{m_cont, iter};
 		}
 
