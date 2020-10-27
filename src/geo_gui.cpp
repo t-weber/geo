@@ -12,6 +12,7 @@
 #include <QLabel>
 #include <QStatusBar>
 #include <QMouseEvent>
+#include <QFileDialog>
 #include <QMessageBox>
 
 #include <locale>
@@ -20,6 +21,9 @@
 #include <vector>
 #include <iostream>
 
+#include <boost/property_tree/ptree.hpp>
+#include <boost/property_tree/xml_parser.hpp>
+
 #include "geo_algos.h"
 
 
@@ -27,6 +31,7 @@ using t_real = double;
 using t_vec = m::vec<t_real, std::vector>;
 using t_mat = m::mat<t_real, std::vector>;
 
+namespace ptree = boost::property_tree;
 
 
 // ----------------------------------------------------------------------------
@@ -173,6 +178,14 @@ void HullView::resizeEvent(QResizeEvent *evt)
 
 
 
+void HullView::AddVertex(const QPointF& pos)
+{
+	Vertex *vertex = new Vertex{pos};
+	m_vertices.insert(vertex);
+	m_scene->addItem(vertex);
+}
+
+
 void HullView::mousePressEvent(QMouseEvent *evt)
 {
 	QPoint posVP = evt->pos();
@@ -200,10 +213,7 @@ void HullView::mousePressEvent(QMouseEvent *evt)
 		// if no vertex is at this position, create a new one
 		if(!item)
 		{
-			Vertex *vertex = new Vertex{posScene};
-			m_vertices.insert(vertex);
-			m_scene->addItem(vertex);
-
+			AddVertex(posScene);
 			m_dragging = true;
 			UpdateAll();
 		}
@@ -526,6 +536,84 @@ HullWnd::HullWnd(QWidget* pParent) : QMainWindow{pParent},
 	connect(actionNew, &QAction::triggered, [this]()
 		{ m_view->ClearVertices(); });
 
+	QAction *actionLoad = new QAction{"Load...", this};
+	connect(actionLoad, &QAction::triggered, [this]()
+	{
+		if(QString file = QFileDialog::getOpenFileName(this, "Load Data", "",
+			"XML Files (*.xml);;All Files (* *.*)"); file!="")
+		{
+			std::ifstream ifstr(file.toStdString());
+			if(!ifstr)
+			{
+				QMessageBox::critical(this, "Error", "File could not be opened for loading.");
+				return;
+			}
+
+			ptree::ptree prop{};
+			ptree::read_xml(ifstr, prop);
+
+			std::size_t vertidx = 0;
+			while(true)
+			{
+				std::ostringstream ostrVert;
+				ostrVert << "geo2d.hull.vertex_" << vertidx;
+
+				auto vertprop = prop.get_child_optional(ostrVert.str());
+				if(!vertprop)
+					break;
+
+				auto vertx = vertprop->get_optional<t_real>("<xmlattr>.x");
+				auto verty = vertprop->get_optional<t_real>("<xmlattr>.y");
+
+				if(!vertx || !verty)
+					break;
+
+				m_view->AddVertex(QPointF{*vertx, *verty});
+
+				++vertidx;
+			}
+
+			if(vertidx > 0)
+				m_view->UpdateAll();
+			else
+				QMessageBox::warning(this, "Warning", "File contains no data.");
+		}
+	});
+
+	QAction *actionSaveAs = new QAction{"Save as...", this};
+	connect(actionSaveAs, &QAction::triggered, [this]()
+	{
+		if(QString file = QFileDialog::getSaveFileName(this, "Save Data", "",
+			"XML Files (*.xml);;All Files (* *.*)"); file!="")
+		{
+			std::ofstream ofstr(file.toStdString());
+			if(!ofstr)
+			{
+				QMessageBox::critical(this, "Error", "File could not be opened for saving.");
+				return;
+			}
+
+			ptree::ptree prop{};
+
+			std::size_t vertidx = 0;
+			for(const Vertex* vertex : m_view->GetVertices())
+			{
+				QPointF vertexpos = vertex->scenePos();
+
+				std::ostringstream ostrX, ostrY;
+				ostrX << "geo2d.hull.vertex_" << vertidx << ".<xmlattr>.x";
+				ostrY << "geo2d.hull.vertex_" << vertidx << ".<xmlattr>.y";
+
+				prop.put<t_real>(ostrX.str(), vertexpos.x());
+				prop.put<t_real>(ostrY.str(), vertexpos.y());
+
+				++vertidx;
+			}
+
+			ptree::write_xml(ofstr, prop, ptree::xml_writer_make_settings('\t', 1, std::string{"utf-8"}));
+		}
+	});
+
 	QAction *actionQuit = new QAction{"Exit", this};
 	connect(actionQuit, &QAction::triggered, [this]()
 		{ this->close(); });
@@ -601,6 +689,9 @@ HullWnd::HullWnd(QWidget* pParent) : QMainWindow{pParent},
 	QMenu *menuBack = new QMenu{"Backend", this};
 
 	menuFile->addAction(actionNew);
+	menuFile->addSeparator();
+	menuFile->addAction(actionLoad);
+	menuFile->addAction(actionSaveAs);
 	menuFile->addSeparator();
 	menuFile->addAction(actionQuit);
 

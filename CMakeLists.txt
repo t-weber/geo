@@ -10,6 +10,7 @@ cmake_minimum_required(VERSION 3.0)
 
 find_package(Qt5Core REQUIRED)
 find_package(Qt5Widgets REQUIRED)
+find_package(Boost REQUIRED)
 
 
 set(CMAKE_AUTOUIC ON)
@@ -17,11 +18,13 @@ set(CMAKE_AUTOMOC ON)
 
 
 set(CMAKE_CXX_STANDARD 20)
-add_definitions(-std=c++20)
-add_definitions(-Wall -Wextra -Weffc++)
+add_compile_options(-std=c++20)
+add_compile_options(-Wall -Wextra -Weffc++)
 
 
-include_directories("${PROJECT_SOURCE_DIR}")
+add_definitions(${Boost_CXX_FLAGS})
+
+include_directories("${PROJECT_SOURCE_DIR}" "${Boost_INCLUDE_DIRS}" "${Boost_INCLUDE_DIRS}/..")
 
 
 add_executable(geo

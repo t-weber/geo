@@ -67,7 +67,11 @@ public:
 	void SetHullCalculationMethod(HullCalculationMethod m);
 	void SetDelaunayCalculationMethod(DelaunayCalculationMethod m);
 
+	void AddVertex(const QPointF& pos);
 	void ClearVertices();
+	const std::unordered_set<Vertex*>& GetVertices() const { return m_vertices; }
+
+	void UpdateAll();
 
 protected:
 	virtual void mousePressEvent(QMouseEvent *evt) override;
@@ -78,7 +82,6 @@ protected:
 
 	void UpdateHull();
 	void UpdateDelaunay();
-	void UpdateAll();
 
 private:
 	QGraphicsScene *m_scene = nullptr;
