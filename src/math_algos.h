@@ -42,6 +42,21 @@ requires is_scalar<T>
 }
 
 /**
+ * are two angles equal within an epsilon range?
+ */
+template<class T>
+bool angle_equals(T t1, T t2, T eps = std::numeric_limits<T>::epsilon(), T tomod=T{2}*pi<T>)
+requires is_scalar<T>
+{
+	t1 = std::fmod(t1, tomod);
+	if(t1 < 0) t1+=tomod;
+	t2 = std::fmod(t2, tomod);
+	if(t2 < 0) t2+=tomod;
+
+	return std::abs(t1 - t2) <= eps;
+}
+
+/**
  * are two complex numbers equal within an epsilon range?
  */
 template<class T>
@@ -1175,10 +1190,12 @@ requires is_vec<t_vec>
 	auto rt = proj*proj + sphereRad*sphereRad - inner<t_vec>(vecDiff, vecDiff);
 
 	// no intersection
-	if(rt < T(0)) return t_cont<t_vec>{};
+	if(rt < T(0))
+		return t_cont<t_vec>{};
 
 	// one intersection
-	if(equals(rt, T(0))) return t_cont<t_vec>{{ lineOrg + proj*lineDir }};
+	if(equals(rt, T(0)))
+		return t_cont<t_vec>{{ lineOrg + proj*lineDir }};
 
 	// two intersections
 	auto val = std::sqrt(rt);

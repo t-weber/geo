@@ -98,6 +98,31 @@ requires m::is_vec<t_vec>
 }
 
 
+template<class t_vec>
+bool pt_inside_hull(const std::vector<t_vec>& hull, const t_vec& pt)
+requires m::is_vec<t_vec>
+{
+	//auto [hull, midpt] = sort_vertices_by_angle<t_vec>(_hull);
+
+	// iterate vertices
+	for(std::size_t idx1=0; idx1<hull.size(); ++idx1)
+	{
+		std::size_t idx2 = idx1+1;
+		if(idx2 >= hull.size())
+			idx2 = 0;
+
+		const t_vec& vert1 = hull[idx1];
+		const t_vec& vert2 = hull[idx2];
+
+		// outside?
+		if(side_of_line<t_vec>(vert1, vert2, pt) < 0.)
+			return false;
+	}
+
+	return true;
+}
+
+
 template<class t_vec, class t_real = typename t_vec::value_type>
 std::vector<t_vec>
 _remove_duplicates(const std::vector<t_vec>& _verts, t_real eps=std::numeric_limits<t_real>::epsilon())
@@ -149,7 +174,7 @@ requires m::is_vec<t_vec>
 
 template<class t_vec, class t_real = typename t_vec::value_type>
 std::tuple<std::vector<t_vec>, t_vec>
-_sort_vertices_by_angle(const std::vector<t_vec>& _verts)
+sort_vertices_by_angle(const std::vector<t_vec>& _verts)
 requires m::is_vec<t_vec>
 {
 	std::vector<t_vec> verts = _verts;
@@ -163,7 +188,6 @@ requires m::is_vec<t_vec>
 
 	return std::make_tuple(verts, mean);
 }
-
 // ----------------------------------------------------------------------------
 
 
@@ -183,7 +207,7 @@ requires m::is_vec<t_vec>
 		for(std::size_t vertidx=0; vertidx<verts.size(); ++vertidx)
 			hullverts.push_back(verts[vertidx]);
 
-		return std::get<0>(_sort_vertices_by_angle<t_vec>(hullverts));
+		return std::get<0>(sort_vertices_by_angle<t_vec>(hullverts));
 	}
 
 	// divide
@@ -286,7 +310,7 @@ requires m::is_vec<t_vec>
 	}
 
 	hullLeft.insert(hullLeft.end(), hullRight.begin(), hullRight.end());
-	return std::get<0>(_sort_vertices_by_angle<t_vec>(hullLeft));
+	return std::get<0>(sort_vertices_by_angle<t_vec>(hullLeft));
 }
 
 
@@ -319,7 +343,7 @@ requires m::is_vec<t_vec>
 
 	std::vector<t_vec> hull = {{ verts[0], verts[1], verts[2] }};
 	t_vec vert_in_hull = m::zero<t_vec>(2);
-	std::tie(hull, vert_in_hull) = _sort_vertices_by_angle<t_vec>(hull);
+	std::tie(hull, vert_in_hull) = sort_vertices_by_angle<t_vec>(hull);
 
 
 	// test if the vertex is already in the hull
@@ -698,8 +722,10 @@ requires m::is_vec<t_vec>
 				thetriag.emplace_back(std::move(vec));
 			}
 
+			std::tie(thetriag, std::ignore) = sort_vertices_by_angle<t_vec>(thetriag);
 			triags.emplace_back(std::move(thetriag));
 		}
+
 
 		// find neighbouring triangles
 		if(!only_hull)
@@ -724,7 +750,8 @@ requires m::is_vec<t_vec>
 					}
 				}
 
-				++facetIdx;
+				if(++facetIdx >= triags.size())
+					break;
 			}
 		}
 	}
@@ -742,7 +769,7 @@ requires m::is_vec<t_vec>
  * delaunay triangulation using parabolic trafo
  */
 template<class t_vec>
-std::tuple<std::vector<t_vec>, std::vector<std::vector<t_vec>>>
+std::tuple<std::vector<t_vec>, std::vector<std::vector<t_vec>>, std::vector<std::set<std::size_t>>>
 calc_delaunay_parabolic(const std::vector<t_vec>& verts)
 requires m::is_vec<t_vec>
 {
@@ -753,8 +780,9 @@ requires m::is_vec<t_vec>
 	using t_real_qhull = coordT;
 
 	const int dim = 2;
-	std::vector<t_vec> voronoi;		// voronoi vertices
-	std::vector<std::vector<t_vec>> triags;	// delaunay triangles
+	std::vector<t_vec> voronoi;						// voronoi vertices
+	std::vector<std::vector<t_vec>> triags;			// delaunay triangles
+	std::vector<std::set<std::size_t>> neighbours;	// neighbour triangle indices
 
 	try
 	{
@@ -773,11 +801,13 @@ requires m::is_vec<t_vec>
 
 
 		qh::QhullFacetList facets{qh.facetList()};
+		std::vector<void*> facetHandles{};
 
-		for(auto iterFacet=facets.begin(); iterFacet!=facets.end(); ++iterFacet)
+
+		auto facetAllowed = [](auto iterFacet) -> bool
 		{
 			if(iterFacet->isUpperDelaunay())
-				continue;
+				return false;
 
 			// filter out non-visible part of hull
 			qh::QhullHyperplane plane = iterFacet->hyperplane();
@@ -786,6 +816,15 @@ requires m::is_vec<t_vec>
 				normal[i] = t_real{plane[i]};
 			// normal pointing upwards?
 			if(normal[2] > 0.)
+				return false;
+
+			return true;
+		};
+
+
+		for(auto iterFacet=facets.begin(); iterFacet!=facets.end(); ++iterFacet)
+		{
+			if(!facetAllowed(iterFacet))
 				continue;
 
 			std::vector<t_vec> thetriag;
@@ -803,7 +842,35 @@ requires m::is_vec<t_vec>
 			}
 
 			voronoi.emplace_back(calc_circumcentre<t_vec>(thetriag));
+			std::tie(thetriag, std::ignore) = sort_vertices_by_angle<t_vec>(thetriag);
 			triags.emplace_back(std::move(thetriag));
+			facetHandles.push_back(iterFacet->getBaseT());
+		}
+
+
+		// find neighbouring triangles
+		neighbours.resize(triags.size());
+
+		std::size_t facetIdx = 0;
+		for(auto iterFacet=facets.begin(); iterFacet!=facets.end(); ++iterFacet)
+		{
+			if(!facetAllowed(iterFacet))
+				continue;
+
+			qh::QhullFacetSet neighbourFacets{iterFacet->neighborFacets()};
+			for(auto iterNeighbour=neighbourFacets.begin(); iterNeighbour!=neighbourFacets.end(); ++iterNeighbour)
+			{
+				void* handle = (*iterNeighbour).getBaseT();
+				auto iterHandle = std::find(facetHandles.begin(), facetHandles.end(), handle);
+				if(iterHandle != facetHandles.end())
+				{
+					std::size_t handleIdx = iterHandle - facetHandles.begin();
+					neighbours[facetIdx].insert(handleIdx);
+				}
+			}
+
+			if(++facetIdx >= triags.size())
+				break;
 		}
 	}
 	catch(const std::exception& ex)
@@ -811,7 +878,7 @@ requires m::is_vec<t_vec>
 		std::cerr << ex.what() << std::endl;
 	}
 
-	return std::make_tuple(voronoi, triags);
+	return std::make_tuple(voronoi, triags, neighbours);
 }
 
 

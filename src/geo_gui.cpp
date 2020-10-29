@@ -14,6 +14,7 @@
 #include <QMouseEvent>
 #include <QFileDialog>
 #include <QMessageBox>
+#include <QSettings>
 
 #include <locale>
 #include <memory>
@@ -33,6 +34,8 @@ using t_mat = m::mat<t_real, std::vector>;
 
 namespace ptree = boost::property_tree;
 
+const t_real g_eps = 1e-5;
+
 
 // ----------------------------------------------------------------------------
 // #define HULL_CHECK
@@ -49,8 +52,6 @@ static double side_of_line(const QLineF& line, const QPointF& pt)
 
 static bool all_points_on_same_side(const QLineF& line, const std::vector<QPointF>& hullvertices)
 {
-	double eps = 1e-5;
-
 	// find a reference vertex which is sufficiently far from the line
 	std::optional<double> side;
 	for(const QPointF& vert : hullvertices)
@@ -58,7 +59,7 @@ static bool all_points_on_same_side(const QLineF& line, const std::vector<QPoint
 		if(!side)
 		{
 			double curside = side_of_line(line, vert);
-			if(std::abs(curside) > eps)
+			if(std::abs(curside) > g_eps)
 				side = curside;
 		}
 
@@ -70,11 +71,11 @@ static bool all_points_on_same_side(const QLineF& line, const std::vector<QPoint
 		return true;
 
 
-	// are all other vertices on the same sine as the reference vertex (or on the line)?
+	// are all other vertices on the same side as the reference vertex (or on the line)?
 	for(const QPointF& vert : hullvertices)
 	{
 		double curside = side_of_line(line, vert);
-		if(std::signbit(*side) != std::signbit(curside) && std::abs(curside) > eps)
+		if(std::signbit(*side) != std::signbit(curside) && std::abs(curside) > g_eps)
 			return false;
 	}
 
@@ -446,7 +447,7 @@ void HullView::UpdateDelaunay()
 			std::tie(voronoi, triags, neighbours) = calc_delaunay<t_vec>(2, vertices, false);
 			break;
 		case DelaunayCalculationMethod::PARABOLIC:
-			std::tie(voronoi, triags) = calc_delaunay_parabolic<t_vec>(vertices);
+			std::tie(voronoi, triags, neighbours) = calc_delaunay_parabolic<t_vec>(vertices);
 			break;
 		default:
 			QMessageBox::critical(this, "Error", "Unknown Delaunay calculation method.");
@@ -505,9 +506,16 @@ void HullView::UpdateDelaunay()
 		penVoronoi.setWidthF(1.);
 		penVoronoi.setColor(QColor::fromRgbF(1.,0.,0.));
 
+		QPen penVoronoiUnbound;
+		penVoronoiUnbound.setStyle(Qt::DashLine);
+		penVoronoiUnbound.setWidthF(1.);
+		penVoronoiUnbound.setColor(QColor::fromRgbF(1.,0.,0.));
+
 		for(std::size_t idx=0; idx<voronoi.size(); ++idx)
 		{
+			// voronoi vertex and its corresponding delaunay triangle
 			const t_vec& voronoivert = voronoi[idx];
+			const auto& thetriag = triags[idx];
 
 			std::vector<const t_vec*> neighbourverts;
 			for(std::size_t neighbourIdx : neighbours[idx])
@@ -520,15 +528,46 @@ void HullView::UpdateDelaunay()
 				m_voronoi.insert(item);
 			}
 
-			// not all triangle edges have neighbours -> there are infinite regions
+			// not all triangle edges have neighbours -> there are unbound regions
 			if(neighbourverts.size() < 3)
 			{
-				// slopes of existing voronoi edges
-				std::set<t_real> slopes;
-				for(const t_vec* vec : neighbourverts)
-					slopes.insert(line_angle(voronoivert, *vec));
+				//const bool voronoivert_in_triag = pt_inside_hull<t_vec>(thetriag, voronoivert);
 
-				// TODO
+				// slopes of existing voronoi edges
+				std::vector<t_real> slopes;
+				for(const t_vec* vec : neighbourverts)
+					slopes.push_back(line_angle(voronoivert, *vec));
+
+				// iterate delaunay triangle vertices
+				for(std::size_t idx1=0; idx1<thetriag.size(); ++idx1)
+				{
+					std::size_t idx2 = idx1+1;
+					if(idx2 >= thetriag.size())
+						idx2 = 0;
+
+					t_vec vecMid = thetriag[idx1] + (thetriag[idx2] - thetriag[idx1]) * t_real{0.5};
+					t_real angle = line_angle(voronoivert, vecMid);
+
+					// if the slope angle doesn't exist yet, it leads to an unbound external region
+					if(auto iterSlope = std::find_if(slopes.begin(), slopes.end(), [angle](t_real angle2) -> bool
+						{ return m::angle_equals<t_real>(angle, angle2, g_eps, m::pi<t_real>); });
+						iterSlope == slopes.end())
+					{
+						t_vec vecUnbound = (vecMid-voronoivert);
+						t_real lengthUnbound = 1000. / m::norm(vecUnbound);
+						t_vec vecOuter = voronoivert;
+
+						// voronoi vertex on other side of edge?
+						if(side_of_line<t_vec>(thetriag[idx1], thetriag[idx2], voronoivert) < 0.)
+							vecOuter -= lengthUnbound*vecUnbound;
+						else
+							vecOuter += lengthUnbound*vecUnbound;
+
+						QLineF line{QPointF{voronoivert[0], voronoivert[1]}, QPointF{vecOuter[0], vecOuter[1]}};
+						QGraphicsItem *item = m_scene->addLine(line, penVoronoiUnbound);
+						m_voronoi.insert(item);
+					}
+				}
 			}
 		}
 	}
@@ -570,6 +609,32 @@ HullWnd::HullWnd(QWidget* pParent) : QMainWindow{pParent},
 	m_view{new HullView{m_scene.get(), this}},
 	m_statusLabel{std::make_shared<QLabel>(this)}
 {
+	// ------------------------------------------------------------------------
+	// restore settings
+	QSettings settings{this};
+
+	if(settings.contains("wnd_geo"))
+	{
+		QByteArray arr{settings.value("wnd_geo").toByteArray()};
+		this->restoreGeometry(arr);
+	}
+	if(settings.contains("wnd_state"))
+	{
+		QByteArray arr{settings.value("wnd_state").toByteArray()};
+		this->restoreState(arr);
+	}
+
+	m_view->SetCalculateHull(
+		settings.value("calc_hull", m_view->GetCalculateHull()).toBool());
+	m_view->SetCalculateVoronoiVertices(
+		settings.value("calc_voronoivertices", m_view->GetCalculateVoronoiVertices()).toBool());
+	m_view->SetCalculateVoronoiRegions(
+		settings.value("calc_voronoiregions", m_view->GetCalculateVoronoiRegions()).toBool());
+	m_view->SetCalculateDelaunay(
+		settings.value("calc_delaunay", m_view->GetCalculateDelaunay()).toBool());
+	// ------------------------------------------------------------------------
+
+
 	m_view->setRenderHints(QPainter::Antialiasing);
 
 	setWindowTitle("Geo2D");
@@ -670,25 +735,25 @@ HullWnd::HullWnd(QWidget* pParent) : QMainWindow{pParent},
 
 	QAction *actionHull = new QAction{"Convex Hull", this};
 	actionHull->setCheckable(true);
-	actionHull->setChecked(true);
+	actionHull->setChecked(m_view->GetCalculateHull());
 	connect(actionHull, &QAction::toggled, [this](bool b)
 		{ m_view->SetCalculateHull(b); });
 
 	QAction *actionVoronoi = new QAction{"Voronoi Vertices", this};
 	actionVoronoi->setCheckable(true);
-	actionVoronoi->setChecked(true);
+	actionVoronoi->setChecked(m_view->GetCalculateVoronoiVertices());
 	connect(actionVoronoi, &QAction::toggled, [this](bool b)
 		{ m_view->SetCalculateVoronoiVertices(b); });
 
 	QAction *actionVoronoiRegions = new QAction{"Voronoi Regions", this};
 	actionVoronoiRegions->setCheckable(true);
-	actionVoronoiRegions->setChecked(false);
+	actionVoronoiRegions->setChecked(m_view->GetCalculateVoronoiRegions());
 	connect(actionVoronoiRegions, &QAction::toggled, [this](bool b)
 		{ m_view->SetCalculateVoronoiRegions(b); });
 
 	QAction *actionDelaunay = new QAction{"Delaunay Triangulation", this};
 	actionDelaunay->setCheckable(true);
-	actionDelaunay->setChecked(true);
+	actionDelaunay->setChecked(m_view->GetCalculateDelaunay());
 	connect(actionDelaunay, &QAction::toggled, [this](bool b)
 		{ m_view->SetCalculateDelaunay(b); });
 
@@ -792,6 +857,25 @@ void HullWnd::SetStatusMessage(const QString& msg)
 }
 
 
+void HullWnd::closeEvent(QCloseEvent *e)
+{
+	// ------------------------------------------------------------------------
+	// save settings
+	QSettings settings{this};
+
+	QByteArray geo{this->saveGeometry()}, state{this->saveState()};
+	settings.setValue("wnd_geo", geo);
+	settings.setValue("wnd_state", state);
+	settings.setValue("calc_hull", m_view->GetCalculateHull());
+	settings.setValue("calc_voronoivertices", m_view->GetCalculateVoronoiVertices());
+	settings.setValue("calc_voronoiregions", m_view->GetCalculateVoronoiRegions());
+	settings.setValue("calc_delaunay", m_view->GetCalculateDelaunay());
+	// ------------------------------------------------------------------------
+
+	QMainWindow::closeEvent(e);
+}
+
+
 HullWnd::~HullWnd()
 {
 }
@@ -819,6 +903,8 @@ int main(int argc, char** argv)
 	try
 	{
 		auto app = std::make_unique<QApplication>(argc, argv);
+		app->setOrganizationName("tw");
+		app->setApplicationName("geo2d");
 		set_locales();
 
 		auto hullwnd = std::make_unique<HullWnd>();

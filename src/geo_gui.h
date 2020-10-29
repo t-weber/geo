@@ -20,7 +20,6 @@
 #include <vector>
 
 
-
 class Vertex : public QGraphicsItem
 {
 public:
@@ -65,6 +64,11 @@ public:
 	void SetCalculateVoronoiRegions(bool b);
 	void SetCalculateDelaunay(bool b);
 
+	bool GetCalculateHull() const { return m_calchull; }
+	bool GetCalculateVoronoiVertices() const { return m_calcvoronoivertices; }
+	bool GetCalculateVoronoiRegions() const { return m_calcvoronoiregions; }
+	bool GetCalculateDelaunay() const { return m_calcdelaunay; }
+
 	void SetHullCalculationMethod(HullCalculationMethod m);
 	void SetDelaunayCalculationMethod(DelaunayCalculationMethod m);
 
@@ -94,8 +98,8 @@ private:
 
 	bool m_dragging = false;
 	bool m_calchull = true;
-	bool m_calcvoronoivertices = true;
-	bool m_calcvoronoiregions = false;
+	bool m_calcvoronoivertices = false;
+	bool m_calcvoronoiregions = true;
 	bool m_calcdelaunay = true;
 
 	HullCalculationMethod m_hullcalculationmethod = HullCalculationMethod::QHULL;
@@ -116,6 +120,9 @@ public:
 	~HullWnd();
 
 	void SetStatusMessage(const QString& msg);
+
+private:
+	virtual void closeEvent(QCloseEvent *) override;
 
 private:
 	std::shared_ptr<QGraphicsScene> m_scene;
