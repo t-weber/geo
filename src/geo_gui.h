@@ -61,7 +61,8 @@ public:
 	const HullView& operator=(const HullView&) const = delete;
 
 	void SetCalculateHull(bool b);
-	void SetCalculateVoronoi(bool b);
+	void SetCalculateVoronoiVertices(bool b);
+	void SetCalculateVoronoiRegions(bool b);
 	void SetCalculateDelaunay(bool b);
 
 	void SetHullCalculationMethod(HullCalculationMethod m);
@@ -93,7 +94,8 @@ private:
 
 	bool m_dragging = false;
 	bool m_calchull = true;
-	bool m_calcvoronoi = true;
+	bool m_calcvoronoivertices = true;
+	bool m_calcvoronoiregions = false;
 	bool m_calcdelaunay = true;
 
 	HullCalculationMethod m_hullcalculationmethod = HullCalculationMethod::QHULL;

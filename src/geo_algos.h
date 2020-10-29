@@ -13,6 +13,7 @@
 
 #include <vector>
 #include <list>
+#include <set>
 #include <tuple>
 #include <algorithm>
 #include <limits>
@@ -27,6 +28,7 @@
 #include <libqhullcpp/QhullFacet.h>
 #include <libqhullcpp/QhullRidge.h>
 #include <libqhullcpp/QhullFacetList.h>
+#include <libqhullcpp/QhullFacetSet.h>
 #include <libqhullcpp/QhullVertexSet.h>
 
 
@@ -629,9 +631,10 @@ requires m::is_vec<t_vec>
 
 /**
  * delaunay triangulation and voronoi vertices
+ * @returns [ voronoi vertices, triangles, neighbour triangle indices ]
  */
 template<class t_vec>
-std::tuple<std::vector<t_vec>, std::vector<std::vector<t_vec>>>
+std::tuple<std::vector<t_vec>, std::vector<std::vector<t_vec>>, std::vector<std::set<std::size_t>>>
 calc_delaunay(int dim, const std::vector<t_vec>& verts, bool only_hull)
 requires m::is_vec<t_vec>
 {
@@ -641,8 +644,9 @@ requires m::is_vec<t_vec>
 	using t_real = typename t_vec::value_type;
 	using t_real_qhull = coordT;
 
-	std::vector<t_vec> voronoi;		// voronoi vertices
-	std::vector<std::vector<t_vec>> triags;	// delaunay triangles
+	std::vector<t_vec> voronoi;						// voronoi vertices
+	std::vector<std::vector<t_vec>> triags;			// delaunay triangles
+	std::vector<std::set<std::size_t>> neighbours;	// neighbour triangle indices
 
 	try
 	{
@@ -659,11 +663,14 @@ requires m::is_vec<t_vec>
 
 		//qh::QhullVertexList vertices{qh.vertexList()};
 		qh::QhullFacetList facets{qh.facetList()};
+		std::vector<void*> facetHandles{};
 
+		// get all triangles
 		for(auto iterFacet=facets.begin(); iterFacet!=facets.end(); ++iterFacet)
 		{
 			if(iterFacet->isUpperDelaunay())
 				continue;
+			facetHandles.push_back(iterFacet->getBaseT());
 
 			if(!only_hull)
 			{
@@ -693,13 +700,40 @@ requires m::is_vec<t_vec>
 
 			triags.emplace_back(std::move(thetriag));
 		}
+
+		// find neighbouring triangles
+		if(!only_hull)
+		{
+			neighbours.resize(triags.size());
+
+			std::size_t facetIdx = 0;
+			for(auto iterFacet=facets.begin(); iterFacet!=facets.end(); ++iterFacet)
+			{
+				if(iterFacet->isUpperDelaunay())
+					continue;
+
+				qh::QhullFacetSet neighbourFacets{iterFacet->neighborFacets()};
+				for(auto iterNeighbour=neighbourFacets.begin(); iterNeighbour!=neighbourFacets.end(); ++iterNeighbour)
+				{
+					void* handle = (*iterNeighbour).getBaseT();
+					auto iterHandle = std::find(facetHandles.begin(), facetHandles.end(), handle);
+					if(iterHandle != facetHandles.end())
+					{
+						std::size_t handleIdx = iterHandle - facetHandles.begin();
+						neighbours[facetIdx].insert(handleIdx);
+					}
+				}
+
+				++facetIdx;
+			}
+		}
 	}
 	catch(const std::exception& ex)
 	{
 		std::cerr << ex.what() << std::endl;
 	}
 
-	return std::make_tuple(voronoi, triags);
+	return std::make_tuple(voronoi, triags, neighbours);
 }
 
 

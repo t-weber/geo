@@ -277,9 +277,16 @@ void HullView::SetCalculateHull(bool b)
 }
 
 
-void HullView::SetCalculateVoronoi(bool b)
+void HullView::SetCalculateVoronoiVertices(bool b)
 {
-	m_calcvoronoi = b;
+	m_calcvoronoivertices = b;
+	UpdateDelaunay();
+}
+
+
+void HullView::SetCalculateVoronoiRegions(bool b)
+{
+	m_calcvoronoiregions = b;
 	UpdateDelaunay();
 }
 
@@ -349,7 +356,7 @@ void HullView::UpdateHull()
 	switch(m_hullcalculationmethod)
 	{
 		case HullCalculationMethod::QHULL:
-			std::tie(std::ignore, hull) = calc_delaunay<t_vec>(2, vertices, true);
+			std::tie(std::ignore, hull, std::ignore) = calc_delaunay<t_vec>(2, vertices, true);
 			break;
 		case HullCalculationMethod::CONTOUR:
 			hull.emplace_back(calc_hull_contour<t_vec>(vertices));
@@ -420,7 +427,7 @@ void HullView::UpdateDelaunay()
 	m_voronoi.clear();
 
 
-	if((!m_calcdelaunay && !m_calcvoronoi) || m_vertices.size() < 4)
+	if((!m_calcdelaunay && !m_calcvoronoivertices && !m_calcvoronoiregions) || m_vertices.size() < 4)
 		return;
 
 	std::vector<t_vec> vertices;
@@ -431,11 +438,12 @@ void HullView::UpdateDelaunay()
 
 	std::vector<t_vec> voronoi{};
 	std::vector<std::vector<t_vec>> triags{};
+	std::vector<std::set<std::size_t>> neighbours{};
 
 	switch(m_delaunaycalculationmethod)
 	{
 		case DelaunayCalculationMethod::QHULL:
-			std::tie(voronoi, triags) = calc_delaunay<t_vec>(2, vertices, false);
+			std::tie(voronoi, triags, neighbours) = calc_delaunay<t_vec>(2, vertices, false);
 			break;
 		case DelaunayCalculationMethod::PARABOLIC:
 			std::tie(voronoi, triags) = calc_delaunay_parabolic<t_vec>(vertices);
@@ -448,9 +456,8 @@ void HullView::UpdateDelaunay()
 
 	const t_real itemRad = 7.;
 
-	if(m_calcvoronoi)
+	if(m_calcvoronoivertices)
 	{
-		// voronoi vertices
 		QPen penVoronoi;
 		penVoronoi.setStyle(Qt::SolidLine);
 		penVoronoi.setWidthF(1.);
@@ -464,6 +471,7 @@ void HullView::UpdateDelaunay()
 		brushVoronoi.setStyle(Qt::SolidPattern);
 		brushVoronoi.setColor(QColor::fromRgbF(1.,0.,0.));
 
+		// voronoi vertices
 		for(std::size_t idx=0; idx<voronoi.size(); ++idx)
 		{
 			const t_vec& voronoivert = voronoi[idx];
@@ -490,8 +498,49 @@ void HullView::UpdateDelaunay()
 	}
 
 
+	if(m_calcvoronoiregions && neighbours.size()==voronoi.size())
+	{
+		QPen penVoronoi;
+		penVoronoi.setStyle(Qt::SolidLine);
+		penVoronoi.setWidthF(1.);
+		penVoronoi.setColor(QColor::fromRgbF(1.,0.,0.));
+
+		for(std::size_t idx=0; idx<voronoi.size(); ++idx)
+		{
+			const t_vec& voronoivert = voronoi[idx];
+
+			std::vector<const t_vec*> neighbourverts;
+			for(std::size_t neighbourIdx : neighbours[idx])
+			{
+				const t_vec& neighbourvert = voronoi[neighbourIdx];
+				neighbourverts.push_back(&neighbourvert);
+
+				QLineF line{QPointF{voronoivert[0], voronoivert[1]}, QPointF{neighbourvert[0], neighbourvert[1]}};
+				QGraphicsItem *item = m_scene->addLine(line, penVoronoi);
+				m_voronoi.insert(item);
+			}
+
+			// not all triangle edges have neighbours -> there are infinite regions
+			if(neighbourverts.size() < 3)
+			{
+				// slopes of existing voronoi edges
+				std::set<t_real> slopes;
+				for(const t_vec* vec : neighbourverts)
+					slopes.insert(line_angle(voronoivert, *vec));
+
+				// TODO
+			}
+		}
+	}
+
+
 	if(m_calcdelaunay)
 	{
+		QPen penDelaunay;
+		penDelaunay.setStyle(Qt::SolidLine);
+		penDelaunay.setWidthF(1.);
+		penDelaunay.setColor(QColor::fromRgbF(0.,0.,0.));
+
 		// delaunay triangles
 		for(const auto& thetriag : triags)
 		{
@@ -502,7 +551,7 @@ void HullView::UpdateDelaunay()
 					idx2 = 0;
 
 				QLineF line{QPointF{thetriag[idx1][0], thetriag[idx1][1]}, QPointF{thetriag[idx2][0], thetriag[idx2][1]}};
-				QGraphicsItem *item = m_scene->addLine(line);
+				QGraphicsItem *item = m_scene->addLine(line, penDelaunay);
 				m_delaunay.insert(item);
 			}
 		}
@@ -629,7 +678,13 @@ HullWnd::HullWnd(QWidget* pParent) : QMainWindow{pParent},
 	actionVoronoi->setCheckable(true);
 	actionVoronoi->setChecked(true);
 	connect(actionVoronoi, &QAction::toggled, [this](bool b)
-		{ m_view->SetCalculateVoronoi(b); });
+		{ m_view->SetCalculateVoronoiVertices(b); });
+
+	QAction *actionVoronoiRegions = new QAction{"Voronoi Regions", this};
+	actionVoronoiRegions->setCheckable(true);
+	actionVoronoiRegions->setChecked(false);
+	connect(actionVoronoiRegions, &QAction::toggled, [this](bool b)
+		{ m_view->SetCalculateVoronoiRegions(b); });
 
 	QAction *actionDelaunay = new QAction{"Delaunay Triangulation", this};
 	actionDelaunay->setCheckable(true);
@@ -696,7 +751,10 @@ HullWnd::HullWnd(QWidget* pParent) : QMainWindow{pParent},
 	menuFile->addAction(actionQuit);
 
 	menuCalc->addAction(actionHull);
+	menuCalc->addSeparator();
 	menuCalc->addAction(actionVoronoi);
+	menuCalc->addAction(actionVoronoiRegions);
+	menuCalc->addSeparator();
 	menuCalc->addAction(actionDelaunay);
 
 	menuBack->addSeparator()->setText("Convex Hull");
