@@ -573,6 +573,10 @@ HullWnd::HullWnd(QWidget* pParent) : QMainWindow{pParent},
 		QByteArray arr{settings.value("wnd_geo").toByteArray()};
 		this->restoreGeometry(arr);
 	}
+	else
+	{
+		resize(1024, 768);
+	}
 	if(settings.contains("wnd_state"))
 	{
 		QByteArray arr{settings.value("wnd_state").toByteArray()};
@@ -881,7 +885,6 @@ int main(int argc, char** argv)
 		set_locales();
 
 		auto hullwnd = std::make_unique<HullWnd>();
-		hullwnd->resize(1024, 768);
 		hullwnd->show();
 
 		return app->exec();

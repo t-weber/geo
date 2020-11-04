@@ -159,6 +159,75 @@ requires m::is_vec<t_vec>
 }
 
 
+/**
+ * get barycentric coordinates of a point
+ * see: https://en.wikipedia.org/wiki/Barycentric_coordinate_system
+ */
+template<class t_vec>
+t_vec get_barycentric(const t_vec& tri1, const t_vec& tri2, const t_vec& tri3, const t_vec& pt)
+requires m::is_vec<t_vec>
+{
+	using t_real = typename t_vec::value_type;
+	using t_mat = m::mat<t_real, std::vector>;
+
+	t_mat trafo = m::create<t_mat, t_vec>({tri1-tri3, tri2-tri3});
+	auto [inv_trafo, ok] = m::inv<t_mat>(trafo);
+
+	t_vec vecBary = inv_trafo * (pt-tri3);
+
+	//using namespace m_ops;
+	//std::cout << "trafo: " << trafo << "\ninv_trafo: " << inv_trafo << std::endl;
+	//std::cout << "bary: " << vecBary << std::endl;
+	return vecBary;
+}
+
+
+template<class t_vec>
+bool pt_inside_triag(const t_vec& tri1, const t_vec& tri2, const t_vec& tri3, const t_vec& pt)
+requires m::is_vec<t_vec>
+{
+	using t_real = typename t_vec::value_type;
+	const t_vec& vecBary = get_barycentric<t_vec>(tri1, tri2, tri3, pt);
+
+	t_real x = vecBary[0];
+	t_real y = vecBary[1];
+	t_real z = t_real{1} - x - y;
+
+	return x>=t_real{0} && x<t_real{1} &&
+		y>=t_real{0} && y<t_real{1} &&
+		z>=t_real{0} && z<t_real{1};
+}
+
+
+/**
+ * get delaunay triangles conflicting with point pt
+ */
+template<class t_vec>
+std::vector<std::size_t> get_conflicting_triags(const std::vector<std::vector<t_vec>>& triags,
+	const t_vec& pt)
+requires m::is_vec<t_vec>
+{
+	using t_real = typename t_vec::value_type;
+	std::vector<std::size_t> indices;
+
+	for(std::size_t idx=0; idx<triags.size(); ++idx)
+	{
+		const auto& triag = triags[idx];
+		t_vec center = calc_circumcentre<t_vec>(triag);
+
+		// circumscribed circle radius
+		t_real rad = m::norm<t_vec>(triags[0] - center);
+		t_real dist = m::norm<t_vec>(pt - center);
+
+		// point in circumscribed circle?
+		if(dist < rad)
+			indices.push_back(idx);
+	}
+
+	return indices;
+}
+
+
 template<class t_vec, class t_real = typename t_vec::value_type>
 std::vector<t_vec>
 _remove_duplicates(const std::vector<t_vec>& _verts, t_real eps=std::numeric_limits<t_real>::epsilon())
