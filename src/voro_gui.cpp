@@ -5,7 +5,7 @@
  * @license: see 'LICENSE' file
  */
 
-#include "geo_gui.h"
+#include "voro_gui.h"
 
 #include <QApplication>
 #include <QMenuBar>
@@ -13,6 +13,7 @@
 #include <QStatusBar>
 #include <QMouseEvent>
 #include <QFileDialog>
+#include <QSvgGenerator>
 #include <QMessageBox>
 #include <QSettings>
 
@@ -24,66 +25,18 @@
 
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/xml_parser.hpp>
+namespace ptree = boost::property_tree;
 
 #include "geo_algos.h"
-
 
 using t_real = double;
 using t_vec = m::vec<t_real, std::vector>;
 using t_mat = m::mat<t_real, std::vector>;
 
-namespace ptree = boost::property_tree;
-
 const t_real g_eps = 1e-5;
 
 
-// ----------------------------------------------------------------------------
-// #define HULL_CHECK
-
-#ifdef HULL_CHECK
-static double side_of_line(const QLineF& line, const QPointF& pt)
-{
-	QPointF dir1 = line.p2() - line.p1();
-	QPointF dir2 = pt - line.p1();
-
-	return dir1.x()*dir2.y() - dir1.y()*dir2.x();
-}
-
-
-static bool all_points_on_same_side(const QLineF& line, const std::vector<QPointF>& hullvertices)
-{
-	// find a reference vertex which is sufficiently far from the line
-	std::optional<double> side;
-	for(const QPointF& vert : hullvertices)
-	{
-		if(!side)
-		{
-			double curside = side_of_line(line, vert);
-			if(std::abs(curside) > g_eps)
-				side = curside;
-		}
-
-		if(side)
-			break;
-	}
-
-	if(!side)
-		return true;
-
-
-	// are all other vertices on the same side as the reference vertex (or on the line)?
-	for(const QPointF& vert : hullvertices)
-	{
-		double curside = side_of_line(line, vert);
-		if(std::signbit(*side) != std::signbit(curside) && std::abs(curside) > g_eps)
-			return false;
-	}
-
-	return true;
-}
-#endif
-// ----------------------------------------------------------------------------
-
+//#define HULL_CHECK
 
 
 // ----------------------------------------------------------------------------
@@ -142,6 +95,8 @@ HullView::HullView(QGraphicsScene *scene, QWidget *parent) : QGraphicsView(scene
 
 	setInteractive(true);
 	setMouseTracking(true);
+
+	//scale(1., -1.);
 
 	setBackgroundBrush(QBrush{QColor::fromRgbF(0.95, 0.95, 0.95, 1.)});
 }
@@ -376,10 +331,10 @@ void HullView::UpdateHull()
 
 
 #ifdef HULL_CHECK
-	std::vector<QPointF> hullvertices;
+	std::vector<t_vec> hullvertices;
 	for(const auto& thetriag : hull)
 		for(std::size_t idx1=0; idx1<thetriag.size(); ++idx1)
-			hullvertices.emplace_back(QPointF{thetriag[idx1][0], thetriag[idx1][1]});
+			hullvertices.emplace_back(thetriag[idx1]);
 #endif
 
 	// convex hull
@@ -396,12 +351,12 @@ void HullView::UpdateHull()
 			if(idx1 == idx2)
 				continue;
 
-			QLineF line{QPointF{thetriag[idx1][0], thetriag[idx1][1]}, QPointF{thetriag[idx2][0], thetriag[idx2][1]}};
 #ifdef HULL_CHECK
-			if(!all_points_on_same_side(line, hullvertices))
+			if(!all_points_on_same_side(thetriag[idx1], thetriag[idx2], hullvertices, g_eps))
 				continue;
 #endif
 
+			QLineF line{QPointF{thetriag[idx1][0], thetriag[idx1][1]}, QPointF{thetriag[idx2][0], thetriag[idx2][1]}};
 			QGraphicsItem *item = m_scene->addLine(line, penHull);
 			m_hull.insert(item);
 		}
@@ -637,7 +592,7 @@ HullWnd::HullWnd(QWidget* pParent) : QMainWindow{pParent},
 
 	m_view->setRenderHints(QPainter::Antialiasing);
 
-	setWindowTitle("Geo2D");
+	setWindowTitle("Voronoi Diagrams");
 	setCentralWidget(m_view.get());
 
 	QStatusBar *statusBar = new QStatusBar{this};
@@ -670,7 +625,7 @@ HullWnd::HullWnd(QWidget* pParent) : QMainWindow{pParent},
 			while(true)
 			{
 				std::ostringstream ostrVert;
-				ostrVert << "geo2d.hull.vertex_" << vertidx;
+				ostrVert << "voro2d.hull.vertex_" << vertidx;
 
 				auto vertprop = prop.get_child_optional(ostrVert.str());
 				if(!vertprop)
@@ -715,8 +670,8 @@ HullWnd::HullWnd(QWidget* pParent) : QMainWindow{pParent},
 				QPointF vertexpos = vertex->scenePos();
 
 				std::ostringstream ostrX, ostrY;
-				ostrX << "geo2d.hull.vertex_" << vertidx << ".<xmlattr>.x";
-				ostrY << "geo2d.hull.vertex_" << vertidx << ".<xmlattr>.y";
+				ostrX << "voro2d.hull.vertex_" << vertidx << ".<xmlattr>.x";
+				ostrY << "voro2d.hull.vertex_" << vertidx << ".<xmlattr>.y";
 
 				prop.put<t_real>(ostrX.str(), vertexpos.x());
 				prop.put<t_real>(ostrY.str(), vertexpos.y());
@@ -725,6 +680,21 @@ HullWnd::HullWnd(QWidget* pParent) : QMainWindow{pParent},
 			}
 
 			ptree::write_xml(ofstr, prop, ptree::xml_writer_make_settings('\t', 1, std::string{"utf-8"}));
+		}
+	});
+
+	QAction *actionExportSvg = new QAction{"Export SVG...", this};
+	connect(actionExportSvg, &QAction::triggered, [this]()
+	{
+		if(QString file = QFileDialog::getSaveFileName(this, "Export SVG", "",
+			"SVG Files (*.svg);;All Files (* *.*)"); file!="")
+		{
+			QSvgGenerator svggen;
+			svggen.setSize(QSize{width(), height()});
+			svggen.setFileName(file);
+
+			QPainter paint(&svggen);
+			m_scene->render(&paint);
 		}
 	});
 
@@ -813,6 +783,8 @@ HullWnd::HullWnd(QWidget* pParent) : QMainWindow{pParent},
 	menuFile->addAction(actionLoad);
 	menuFile->addAction(actionSaveAs);
 	menuFile->addSeparator();
+	menuFile->addAction(actionExportSvg);
+	menuFile->addSeparator();
 	menuFile->addAction(actionQuit);
 
 	menuCalc->addAction(actionHull);
@@ -834,6 +806,7 @@ HullWnd::HullWnd(QWidget* pParent) : QMainWindow{pParent},
 
 	// menu bar
 	QMenuBar *menuBar = new QMenuBar{this};
+	menuBar->setNativeMenuBar(false);
 	menuBar->addMenu(menuFile);
 	menuBar->addMenu(menuCalc);
 	menuBar->addMenu(menuBack);
@@ -904,7 +877,7 @@ int main(int argc, char** argv)
 	{
 		auto app = std::make_unique<QApplication>(argc, argv);
 		app->setOrganizationName("tw");
-		app->setApplicationName("geo2d");
+		app->setApplicationName("voro2d");
 		set_locales();
 
 		auto hullwnd = std::make_unique<HullWnd>();

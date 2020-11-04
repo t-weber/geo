@@ -5,8 +5,8 @@
  * @license: see 'LICENSE' file
  */
 
-#ifndef __GEO_GUI_H__
-#define __GEO_GUI_H__
+#ifndef __VORO_GUI_H__
+#define __VORO_GUI_H__
 
 
 #include <QMainWindow>

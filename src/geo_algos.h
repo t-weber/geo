@@ -98,6 +98,42 @@ requires m::is_vec<t_vec>
 }
 
 
+template<class t_vec, class t_real = typename t_vec::value_type>
+bool all_points_on_same_side(const t_vec& lineA, const t_vec& lineB,
+	const std::vector<t_vec>& hullvertices, t_real eps=1e-5)
+requires m::is_vec<t_vec>
+{
+	// find a reference vertex which is sufficiently far from the line
+	std::optional<t_real> side;
+	for(const t_vec& vert : hullvertices)
+	{
+		if(!side)
+		{
+			t_real curside = side_of_line(lineA, lineB, vert);
+			if(std::abs(curside) > eps)
+				side = curside;
+		}
+
+		if(side)
+			break;
+	}
+
+	if(!side)
+		return true;
+
+
+	// are all other vertices on the same side as the reference vertex (or on the line)?
+	for(const t_vec& vert : hullvertices)
+	{
+		t_real curside = side_of_line(lineA, lineB, vert);
+		if(std::signbit(*side) != std::signbit(curside) && std::abs(curside) > eps)
+			return false;
+	}
+
+	return true;
+}
+
+
 template<class t_vec>
 bool pt_inside_hull(const std::vector<t_vec>& hull, const t_vec& pt)
 requires m::is_vec<t_vec>

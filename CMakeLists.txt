@@ -9,7 +9,9 @@ cmake_minimum_required(VERSION 3.0)
 
 
 find_package(Qt5Core REQUIRED)
+find_package(Qt5Gui REQUIRED)
 find_package(Qt5Widgets REQUIRED)
+find_package(Qt5Svg REQUIRED)
 find_package(Boost REQUIRED)
 
 
@@ -24,16 +26,30 @@ add_compile_options(-Wall -Wextra -Weffc++)
 
 add_definitions(${Boost_CXX_FLAGS})
 
-include_directories("${PROJECT_SOURCE_DIR}" "${Boost_INCLUDE_DIRS}" "${Boost_INCLUDE_DIRS}/..")
-
-
-add_executable(geo
-	src/geo_gui.cpp src/geo_gui.h
-	src/geo_algos.h src/math_algos.h
+include_directories(
+	${PROJECT_SOURCE_DIR}
+	${Boost_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS}/..
+	${Qt5Svg_INCLUDE_DIRS}
 )
 
 
-target_link_libraries(geo
-	Qt5::Core Qt5::Widgets
+add_executable(voro
+	src/voro_gui.cpp src/voro_gui.h
+	src/geo_algos.h src/math_algos.h
+)
+
+target_link_libraries(voro
+	Qt5::Core Qt5::Gui Qt5::Widgets Qt5::Svg
 	-lqhull_r -lqhullcpp
+)
+
+
+
+add_executable(caster
+	src/caster_gui.cpp src/caster_gui.h
+)
+
+target_link_libraries(caster
+	Qt5::Core Qt5::Gui Qt5::Widgets
+	${Boost_LIBRARIES}
 )
