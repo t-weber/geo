@@ -315,14 +315,14 @@ void HullView::UpdateHull()
 			std::tie(std::ignore, hull, std::ignore) = calc_delaunay<t_vec>(2, vertices, true);
 			break;
 		case HullCalculationMethod::CONTOUR:
-			hull.emplace_back(calc_hull_contour<t_vec>(vertices));
+			hull.emplace_back(calc_hull_contour<t_vec>(vertices, g_eps));
 			break;
 		case HullCalculationMethod::ITERATIVE:
 			//hull.emplace_back(calc_hull_iterative<t_vec>(vertices));
-			hull.emplace_back(calc_hull_iterative_bintree<t_vec>(vertices));
+			hull.emplace_back(calc_hull_iterative_bintree<t_vec>(vertices, g_eps));
 			break;
 		case HullCalculationMethod::RECURSIVE:
-			hull.emplace_back(calc_hull_recursive<t_vec>(vertices));
+			hull.emplace_back(calc_hull_recursive<t_vec>(vertices, g_eps));
 			break;
 		default:
 			QMessageBox::critical(this, "Error", "Unknown hull calculation method.");
@@ -400,6 +400,9 @@ void HullView::UpdateDelaunay()
 	{
 		case DelaunayCalculationMethod::QHULL:
 			std::tie(voronoi, triags, neighbours) = calc_delaunay<t_vec>(2, vertices, false);
+			break;
+		case DelaunayCalculationMethod::ITERATIVE:
+			std::tie(voronoi, triags, neighbours) = calc_delaunay_iterative<t_vec>(vertices, g_eps);
 			break;
 		case DelaunayCalculationMethod::PARABOLIC:
 			std::tie(voronoi, triags, neighbours) = calc_delaunay_parabolic<t_vec>(vertices);
@@ -760,6 +763,11 @@ HullWnd::HullWnd(QWidget* pParent) : QMainWindow{pParent},
 	connect(actionDelaunayQHull, &QAction::toggled, [this]()
 		{ m_view->SetDelaunayCalculationMethod(DelaunayCalculationMethod::QHULL); });
 
+	QAction *actionDelaunayInc = new QAction{"Incremental", this};
+	actionDelaunayInc->setCheckable(true);
+	connect(actionDelaunayInc, &QAction::toggled, [this]()
+	{ m_view->SetDelaunayCalculationMethod(DelaunayCalculationMethod::ITERATIVE); });
+
 	QAction *actionDelaunayPara = new QAction{"Parabolic Trafo", this};
 	actionDelaunayPara->setCheckable(true);
 	connect(actionDelaunayPara, &QAction::toggled, [this]()
@@ -774,6 +782,7 @@ HullWnd::HullWnd(QWidget* pParent) : QMainWindow{pParent},
 
 	QActionGroup *groupDelaunayBack = new QActionGroup{this};
 	groupDelaunayBack->addAction(actionDelaunayQHull);
+	groupDelaunayBack->addAction(actionDelaunayInc);
 	groupDelaunayBack->addAction(actionDelaunayPara);
 
 
@@ -805,6 +814,7 @@ HullWnd::HullWnd(QWidget* pParent) : QMainWindow{pParent},
 	menuBack->addAction(actionHullDivide);
 	menuBack->addSeparator()->setText("Delaunay");
 	menuBack->addAction(actionDelaunayQHull);
+	menuBack->addAction(actionDelaunayInc);
 	menuBack->addAction(actionDelaunayPara);
 
 

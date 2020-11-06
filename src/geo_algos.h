@@ -200,6 +200,44 @@ requires m::is_vec<t_vec>
 
 
 /**
+ * get triangle containing point pt
+ */
+template<class t_vec>
+std::optional<std::size_t> get_containing_triag(const std::vector<std::vector<t_vec>>& triags,
+	const t_vec& pt)
+requires m::is_vec<t_vec>
+{
+	for(std::size_t idx=0; idx<triags.size(); ++idx)
+	{
+		const auto& triag = triags[idx];
+		if(pt_inside_triag<t_vec>(triag[0], triag[1], triag[2], pt))
+			return idx;
+	}
+
+	return std::nullopt;
+}
+
+
+/**
+ * is delaunay triangle conflicting with point pt
+ */
+template<class t_vec>
+bool is_conflicting_triag(const std::vector<t_vec>& triag, const t_vec& pt)
+requires m::is_vec<t_vec>
+{
+	using t_real = typename t_vec::value_type;
+
+	// circumscribed circle radius
+	t_vec center = calc_circumcentre<t_vec>(triag);
+	t_real rad = m::norm<t_vec>(triag[0] - center);
+	t_real dist = m::norm<t_vec>(pt - center);
+
+	// point in circumscribed circle?
+	return dist < rad;
+}
+
+
+/**
  * get delaunay triangles conflicting with point pt
  */
 template<class t_vec>
@@ -212,15 +250,7 @@ requires m::is_vec<t_vec>
 
 	for(std::size_t idx=0; idx<triags.size(); ++idx)
 	{
-		const auto& triag = triags[idx];
-		t_vec center = calc_circumcentre<t_vec>(triag);
-
-		// circumscribed circle radius
-		t_real rad = m::norm<t_vec>(triags[0] - center);
-		t_real dist = m::norm<t_vec>(pt - center);
-
-		// point in circumscribed circle?
-		if(dist < rad)
+		if(is_conflicting_triag<t_vec>(triags[idx], pt))
 			indices.push_back(idx);
 	}
 
@@ -863,6 +893,108 @@ requires m::is_vec<t_vec>
 	catch(const std::exception& ex)
 	{
 		std::cerr << ex.what() << std::endl;
+	}
+
+	return std::make_tuple(voronoi, triags, neighbours);
+}
+
+
+
+/**
+ * iterative delaunay triangulation
+ */
+template<class t_vec, class t_real = typename t_vec::value_type>
+std::tuple<std::vector<t_vec>, std::vector<std::vector<t_vec>>, std::vector<std::set<std::size_t>>>
+calc_delaunay_iterative(const std::vector<t_vec>& verts , t_real eps = 1e-5)
+requires m::is_vec<t_vec>
+{
+	using namespace m_ops;
+
+	std::vector<t_vec> voronoi;						// voronoi vertices
+	std::vector<std::vector<t_vec>> triags;			// delaunay triangles
+	std::vector<std::set<std::size_t>> neighbours;	// neighbour triangle indices
+
+	if(verts.size() < 3)
+		return std::make_tuple(voronoi, triags, neighbours);
+
+	// first triangle
+	triags.emplace_back(std::vector<t_vec>{{ verts[0], verts[1], verts[2] }});
+
+	// insert vertices iteratively
+	for(std::size_t newvertidx=3; newvertidx<verts.size(); ++newvertidx)
+	{
+		const t_vec& newvert = verts[newvertidx];
+
+		// find triangle containing the new vertex
+		if(auto optidx = get_containing_triag<t_vec>(triags, newvert); optidx)
+		{
+			auto conttriag = std::move(triags[*optidx]);
+			triags.erase(triags.begin() + *optidx);
+
+			// new delaunay edges connecting to newvert
+			triags.emplace_back(std::vector<t_vec>{{ newvert, conttriag[0], conttriag[1] }});
+			triags.emplace_back(std::vector<t_vec>{{ newvert, conttriag[0], conttriag[2] }});
+			triags.emplace_back(std::vector<t_vec>{{ newvert, conttriag[1], conttriag[2] }});
+			std::size_t newtriagidx1 = triags.size()-3;
+			std::size_t newtriagidx2 = triags.size()-2;
+			std::size_t newtriagidx3 = triags.size()-1;
+
+
+			// find all conflicting triangles
+			// TODO: restrict check to triangles sharing an edge with conttriag
+			for(std::size_t confidx=0; confidx<triags.size(); ++confidx)
+			{
+				const auto& conftriag = triags[confidx];
+				if(!is_conflicting_triag<t_vec>(conftriag, newvert))
+					continue;
+
+				// get vertex not shared with conttriag
+				std::size_t idxnotshared;
+				for(idxnotshared=0; idxnotshared<3; ++idxnotshared)
+				{
+					if(!m::equals<t_vec>(conftriag[idxnotshared], conttriag[0], eps) &&
+						!m::equals<t_vec>(conftriag[idxnotshared], conttriag[1], eps) &&
+						!m::equals<t_vec>(conftriag[idxnotshared], conttriag[2], eps))
+						break;
+				}
+				if(idxnotshared >= 3)
+					continue;
+
+				// vertices shared with conttriag
+				std::size_t idxshared1 = (idxnotshared+1) % 3;
+				std::size_t idxshared2 = (idxnotshared+2) % 3;
+
+				// to which one of the newly created triangles does the conflicting one border?
+				std::optional<std::size_t> sharedtriagidx;
+				if((m::equals<t_vec>(conftriag[idxshared1], conttriag[0], eps) &&
+					m::equals<t_vec>(conftriag[idxshared2], conttriag[1], eps)) ||
+					(m::equals<t_vec>(conftriag[idxshared1], conttriag[1], eps) &&
+					m::equals<t_vec>(conftriag[idxshared2], conttriag[0], eps)))
+					sharedtriagidx = newtriagidx1;
+				else if((m::equals<t_vec>(conftriag[idxshared1], conttriag[0], eps) &&
+					m::equals<t_vec>(conftriag[idxshared2], conttriag[2], eps)) ||
+					(m::equals<t_vec>(conftriag[idxshared1], conttriag[2], eps) &&
+					m::equals<t_vec>(conftriag[idxshared2], conttriag[0], eps)))
+					sharedtriagidx = newtriagidx2;
+				else if((m::equals<t_vec>(conftriag[idxshared1], conttriag[1], eps) &&
+					m::equals<t_vec>(conftriag[idxshared2], conttriag[2], eps)) ||
+					(m::equals<t_vec>(conftriag[idxshared1], conttriag[2], eps) &&
+					m::equals<t_vec>(conftriag[idxshared2], conttriag[1], eps)))
+					sharedtriagidx = newtriagidx3;
+				if(!sharedtriagidx)
+					continue;
+
+				// replace conflicting triangle
+				triags[*sharedtriagidx] = std::vector<t_vec>{{ newvert, conftriag[idxnotshared], conftriag[idxshared2] }};
+				triags[confidx] = std::vector<t_vec>{{ newvert, conftriag[idxnotshared], conftriag[idxshared1] }};
+			}
+		}
+
+		// new vertex is outside any triangle
+		else
+		{
+			// TODO
+		}
 	}
 
 	return std::make_tuple(voronoi, triags, neighbours);

@@ -46,6 +46,7 @@ enum class HullCalculationMethod
 enum class DelaunayCalculationMethod
 {
 	QHULL,
+	ITERATIVE,
 	PARABOLIC,
 };
 
