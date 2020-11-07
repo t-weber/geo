@@ -625,6 +625,8 @@ HullWnd::HullWnd(QWidget* pParent) : QMainWindow{pParent},
 				return;
 			}
 
+			m_view->ClearVertices();
+
 			ptree::ptree prop{};
 			ptree::read_xml(ifstr, prop);
 
@@ -814,7 +816,7 @@ HullWnd::HullWnd(QWidget* pParent) : QMainWindow{pParent},
 	menuBack->addAction(actionHullDivide);
 	menuBack->addSeparator()->setText("Delaunay");
 	menuBack->addAction(actionDelaunayQHull);
-	menuBack->addAction(actionDelaunayInc);
+	//menuBack->addAction(actionDelaunayInc);
 	menuBack->addAction(actionDelaunayPara);
 
 

@@ -164,7 +164,7 @@ requires m::is_vec<t_vec>
  * see: https://en.wikipedia.org/wiki/Barycentric_coordinate_system
  */
 template<class t_vec>
-t_vec get_barycentric(const t_vec& tri1, const t_vec& tri2, const t_vec& tri3, const t_vec& pt)
+std::optional<t_vec> get_barycentric(const t_vec& tri1, const t_vec& tri2, const t_vec& tri3, const t_vec& pt)
 requires m::is_vec<t_vec>
 {
 	using t_real = typename t_vec::value_type;
@@ -172,6 +172,8 @@ requires m::is_vec<t_vec>
 
 	t_mat trafo = m::create<t_mat, t_vec>({tri1-tri3, tri2-tri3});
 	auto [inv_trafo, ok] = m::inv<t_mat>(trafo);
+	if(!ok)
+		return std::nullopt;
 
 	t_vec vecBary = inv_trafo * (pt-tri3);
 
@@ -187,10 +189,12 @@ bool pt_inside_triag(const t_vec& tri1, const t_vec& tri2, const t_vec& tri3, co
 requires m::is_vec<t_vec>
 {
 	using t_real = typename t_vec::value_type;
-	const t_vec& vecBary = get_barycentric<t_vec>(tri1, tri2, tri3, pt);
+	auto vecBary = get_barycentric<t_vec>(tri1, tri2, tri3, pt);
+	if(!vecBary)
+		return false;
 
-	t_real x = vecBary[0];
-	t_real y = vecBary[1];
+	t_real x = (*vecBary)[0];
+	t_real y = (*vecBary)[1];
 	t_real z = t_real{1} - x - y;
 
 	return x>=t_real{0} && x<t_real{1} &&
@@ -937,6 +941,7 @@ requires m::is_vec<t_vec>
 
 /**
  * iterative delaunay triangulation
+ * TODO: does not yet work
  */
 template<class t_vec, class t_real = typename t_vec::value_type>
 std::tuple<std::vector<t_vec>, std::vector<std::vector<t_vec>>, std::vector<std::set<std::size_t>>>
@@ -957,6 +962,35 @@ requires m::is_vec<t_vec>
 
 	// currently inserted vertices
 	std::vector<t_vec> curverts{{ verts[0], verts[1], verts[2] }};
+
+
+	// returns [triangle index, shared index 1, shared index 2, nonshared index]
+	auto get_triag_sharing_edge = [&triags, eps](const t_vec& vert1, const t_vec& vert2)
+		-> std::optional<std::tuple<std::size_t, std::size_t, std::size_t, std::size_t>>
+	{
+		for(std::size_t i=0; i<triags.size(); ++i)
+		{
+			const auto& triag = triags[i];
+
+			// test all edge combinations
+			if(m::equals<t_vec>(triag[0], vert1, eps) && m::equals<t_vec>(triag[1], vert2, eps))
+				return std::make_tuple(i, 0, 1, 2);
+			if(m::equals<t_vec>(triag[1], vert1, eps) && m::equals<t_vec>(triag[0], vert2, eps))
+				return std::make_tuple(i, 1, 0, 2);
+			if(m::equals<t_vec>(triag[0], vert1, eps) && m::equals<t_vec>(triag[2], vert2, eps))
+				return std::make_tuple(i, 0, 2, 1);
+			if(m::equals<t_vec>(triag[2], vert1, eps) && m::equals<t_vec>(triag[0], vert2, eps))
+				return std::make_tuple(i, 2, 0, 1);
+			if(m::equals<t_vec>(triag[1], vert1, eps) && m::equals<t_vec>(triag[2], vert2, eps))
+				return std::make_tuple(i, 1, 2, 0);
+			if(m::equals<t_vec>(triag[2], vert1, eps) && m::equals<t_vec>(triag[1], vert2, eps))
+				return std::make_tuple(i, 2, 1, 0);
+		}
+
+		// no shared edge found
+		return std::nullopt;
+	};
+
 
 	// insert vertices iteratively
 	for(std::size_t newvertidx=3; newvertidx<verts.size(); ++newvertidx)
@@ -1026,8 +1060,6 @@ requires m::is_vec<t_vec>
 				triags[*sharedtriagidx] = std::vector<t_vec>{{ newvert, conftriag[idxnotshared], conftriag[idxshared2] }};
 				triags[confidx] = std::vector<t_vec>{{ newvert, conftriag[idxnotshared], conftriag[idxshared1] }};
 			}
-
-			curverts.push_back(newvert);
 		}
 
 		// new vertex is outside of any triangle
@@ -1036,55 +1068,63 @@ requires m::is_vec<t_vec>
 			auto hull = calc_hull_iterative_bintree<t_vec>(curverts, eps);
 
 			// find the points in the hull visible from newvert
-			// start indices
-			auto [already_in_hull, hullvertidx1, hullvertidx2] =
-				is_vert_in_hull<t_vec>(hull, newvert);
-			if(already_in_hull)
-				continue;
-
-			// find visible vertices like in calc_hull_iterative
-			circular_wrapper circularverts(hull);
-			auto iterLower = circularverts.begin() + hullvertidx1;
-			auto iterUpper = circularverts.begin() + hullvertidx2;
-
-			// correct cycles
-			if(hullvertidx1 > hullvertidx2 && iterLower.GetRound()==iterUpper.GetRound())
-				iterUpper.SetRound(iterLower.GetRound()+1);
-
-			for(; iterLower.GetRound()>=-2; --iterLower)
-			{
-				if(side_of_line<t_vec>(*iterLower, newvert, *(iterLower-1)) >= 0.)
-					break;
-			}
-
-			for(; iterUpper.GetRound()<=2; ++iterUpper)
-			{
-				if(side_of_line<t_vec>(*iterUpper, newvert, *(iterUpper+1)) <= 0.)
-					break;
-			}
-
 			std::vector<t_vec> visible;
-			for(auto iter=iterLower; iter<=iterUpper; ++iter)
-				visible.push_back(*iter);
+			{
+				// start indices
+				auto [already_in_hull, hullvertidx1, hullvertidx2] =
+					is_vert_in_hull<t_vec>(hull, newvert);
+				if(already_in_hull)
+					continue;
+
+				// find visible vertices like in calc_hull_iterative
+				circular_wrapper circularverts(hull);
+				auto iterLower = circularverts.begin() + hullvertidx1;
+				auto iterUpper = circularverts.begin() + hullvertidx2;
+
+				// correct cycles
+				if(hullvertidx1 > hullvertidx2 && iterLower.GetRound()==iterUpper.GetRound())
+					iterUpper.SetRound(iterLower.GetRound()+1);
+
+				for(; iterLower.GetRound()>=-2; --iterLower)
+				{
+					if(side_of_line<t_vec>(*iterLower, newvert, *(iterLower-1)) >= 0.)
+						break;
+				}
+
+				for(; iterUpper.GetRound()<=2; ++iterUpper)
+				{
+					if(side_of_line<t_vec>(*iterUpper, newvert, *(iterUpper+1)) <= 0.)
+						break;
+				}
+
+				for(auto iter=iterLower; iter<=iterUpper; ++iter)
+					visible.push_back(*iter);
+			}
 
 			for(std::size_t visidx=0; visidx<visible.size()-1; ++visidx)
 			{
-				// new delaunay edges connecting to newvert
-				triags.emplace_back(std::vector<t_vec>{{ visible[visidx], newvert, visible[visidx+1] }});
-			}
-
-
-			// find all conflicting triangles
-			// TODO: restrict check to triangles sharing an edge with conttriag
-			for(std::size_t confidx=0; confidx<triags.size(); ++confidx)
-			{
-				const auto& conftriag = triags[confidx];
-				if(!is_conflicting_triag<t_vec>(conftriag, newvert))
+				// get triangle on other side of shared edge
+				auto optother = get_triag_sharing_edge(visible[visidx], visible[visidx+1]);
+				if(!optother)
 					continue;
+				const auto [othertriag, sharedidx1, sharedidx2, nonsharedidx] = *optother;
 
-				// TODO
+				if(!is_conflicting_triag<t_vec>(triags[othertriag], newvert))
+				{
+					// new delaunay edges connecting to newvert
+					triags.emplace_back(std::vector<t_vec>{{ newvert, visible[visidx], visible[visidx+1] }});
+				}
+				else
+				{
+					triags.emplace_back(std::vector<t_vec>
+						{{ newvert, triags[othertriag][nonsharedidx], triags[othertriag][sharedidx1] }});
+					triags[othertriag] = std::vector<t_vec>
+						{{ newvert, triags[othertriag][nonsharedidx], triags[othertriag][sharedidx2] }};
+				}
 			}
 		}
+
+		curverts.push_back(newvert);
 	}
 
 	return std::make_tuple(voronoi, triags, neighbours);
