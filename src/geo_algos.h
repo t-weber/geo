@@ -245,7 +245,6 @@ std::vector<std::size_t> get_conflicting_triags(const std::vector<std::vector<t_
 	const t_vec& pt)
 requires m::is_vec<t_vec>
 {
-	using t_real = typename t_vec::value_type;
 	std::vector<std::size_t> indices;
 
 	for(std::size_t idx=0; idx<triags.size(); ++idx)
@@ -255,6 +254,24 @@ requires m::is_vec<t_vec>
 	}
 
 	return indices;
+}
+
+
+template<class t_vec>
+std::tuple<bool, t_vec>
+intersect_lines(const t_vec& pos1a, const t_vec& pos1b,
+	const t_vec& pos2a, const t_vec& pos2b)
+{
+	t_vec dir1 = pos1b - pos1a;
+	t_vec dir2 = pos2b - pos2a;
+
+	auto[pt1, pt2, valid, dist, param1, param2] =
+		m::intersect_line_line(pos1a, dir1, pos2a, dir2);
+
+	if(!valid || param1<0. || param1>1. || param2<0. || param2>1.)
+		return std::make_pair(false, m::create<t_vec>({}));
+
+	return std::make_pair(true, pt1);
 }
 
 
@@ -464,6 +481,45 @@ requires m::is_vec<t_vec>
 // ----------------------------------------------------------------------------
 
 
+// tests if the vertex is in the hull
+template<class t_vec>
+std::tuple<bool, std::size_t, std::size_t>
+is_vert_in_hull(const std::vector<t_vec>& hull, const t_vec& newvert, const t_vec *vert_in_hull=nullptr)
+requires m::is_vec<t_vec>
+{
+	using t_real = typename t_vec::value_type;
+
+	// get a point inside the hull if none given
+	t_vec mean;
+	if(!vert_in_hull)
+	{
+		mean = std::accumulate(hull.begin(), hull.end(), m::zero<t_vec>(2));
+		mean /= t_real(hull.size());
+		vert_in_hull = &mean;
+	}
+
+	for(std::size_t hullvertidx1=0; hullvertidx1<hull.size(); ++hullvertidx1)
+	{
+		std::size_t hullvertidx2 = hullvertidx1+1;
+		if(hullvertidx2 >= hull.size())
+			hullvertidx2 = 0;
+
+		const t_vec& hullvert1 = hull[hullvertidx1];
+		const t_vec& hullvert2 = hull[hullvertidx2];
+
+		// new vertex is between these two points
+		if(side_of_line<t_vec>(*vert_in_hull, hullvert1, newvert) > 0. &&
+			side_of_line<t_vec>(*vert_in_hull, hullvert2, newvert) <= 0.)
+		{
+			// outside hull?
+			if(side_of_line<t_vec>(hullvert1, hullvert2, newvert) < 0.)
+				return std::make_tuple(false, hullvertidx1, hullvertidx2);
+		}
+	}
+	return std::make_tuple(true, 0, 0);
+};
+
+
 template<class t_vec, class t_real = typename t_vec::value_type>
 std::vector<t_vec>
 calc_hull_iterative(const std::vector<t_vec>& _verts, t_real eps = 1e-5)
@@ -481,42 +537,20 @@ requires m::is_vec<t_vec>
 	std::tie(hull, vert_in_hull) = sort_vertices_by_angle<t_vec>(hull);
 
 
-	// test if the vertex is already in the hull
-	auto is_in_hull = [&hull, &vert_in_hull](const t_vec& newvert) -> std::tuple<bool, std::size_t, std::size_t>
-	{
-		for(std::size_t hullvertidx1=0; hullvertidx1<hull.size(); ++hullvertidx1)
-		{
-			std::size_t hullvertidx2 = hullvertidx1+1;
-			if(hullvertidx2 >= hull.size())
-				hullvertidx2 = 0;
-
-			const t_vec& hullvert1 = hull[hullvertidx1];
-			const t_vec& hullvert2 = hull[hullvertidx2];
-
-			// new vertex is between these two points
-			if(side_of_line<t_vec>(vert_in_hull, hullvert1, newvert) > 0. &&
-				side_of_line<t_vec>(vert_in_hull, hullvert2, newvert) <= 0.)
-			{
-				// outside hull?
-				if(side_of_line<t_vec>(hullvert1, hullvert2, newvert) < 0.)
-					return std::make_tuple(false, hullvertidx1, hullvertidx2);
-			}
-		}
-		return std::make_tuple(true, 0, 0);
-	};
-
-
 	// insert new vertex into hull
 	for(std::size_t vertidx=3; vertidx<verts.size(); ++vertidx)
 	{
 		const t_vec& newvert = verts[vertidx];
-		auto [already_in_hull, hullvertidx1, hullvertidx2] = is_in_hull(newvert);
+
+		// is the vertex already in the hull?
+		auto [already_in_hull, hullvertidx1, hullvertidx2] =
+			is_vert_in_hull<t_vec>(hull, newvert, &vert_in_hull);
 		if(already_in_hull)
 			continue;
 
 		circular_wrapper circularverts(hull);
-		auto iterLower = circularverts.begin()+hullvertidx1;
-		auto iterUpper = circularverts.begin()+hullvertidx2;
+		auto iterLower = circularverts.begin() + hullvertidx1;
+		auto iterUpper = circularverts.begin() + hullvertidx2;
 
 		// correct cycles
 		if(hullvertidx1 > hullvertidx2 && iterLower.GetRound()==iterUpper.GetRound())
@@ -592,7 +626,8 @@ requires m::is_vec<t_vec>
 
 
 	// test if the vertex is already in the hull
-	auto is_in_hull = [&vert_in_hull, &hull](const t_vec& newvert) -> std::tuple<bool, std::size_t, std::size_t>
+	auto is_in_hull = [&vert_in_hull, &hull](const t_vec& newvert)
+		-> std::tuple<bool, std::size_t, std::size_t>
 	{
 		t_node tosearch(vert_in_hull, newvert);
 		auto iter2 = hull.upper_bound(tosearch);
@@ -920,6 +955,9 @@ requires m::is_vec<t_vec>
 	// first triangle
 	triags.emplace_back(std::vector<t_vec>{{ verts[0], verts[1], verts[2] }});
 
+	// currently inserted vertices
+	std::vector<t_vec> curverts{{ verts[0], verts[1], verts[2] }};
+
 	// insert vertices iteratively
 	for(std::size_t newvertidx=3; newvertidx<verts.size(); ++newvertidx)
 	{
@@ -988,12 +1026,64 @@ requires m::is_vec<t_vec>
 				triags[*sharedtriagidx] = std::vector<t_vec>{{ newvert, conftriag[idxnotshared], conftriag[idxshared2] }};
 				triags[confidx] = std::vector<t_vec>{{ newvert, conftriag[idxnotshared], conftriag[idxshared1] }};
 			}
+
+			curverts.push_back(newvert);
 		}
 
-		// new vertex is outside any triangle
+		// new vertex is outside of any triangle
 		else
 		{
-			// TODO
+			auto hull = calc_hull_iterative_bintree<t_vec>(curverts, eps);
+
+			// find the points in the hull visible from newvert
+			// start indices
+			auto [already_in_hull, hullvertidx1, hullvertidx2] =
+				is_vert_in_hull<t_vec>(hull, newvert);
+			if(already_in_hull)
+				continue;
+
+			// find visible vertices like in calc_hull_iterative
+			circular_wrapper circularverts(hull);
+			auto iterLower = circularverts.begin() + hullvertidx1;
+			auto iterUpper = circularverts.begin() + hullvertidx2;
+
+			// correct cycles
+			if(hullvertidx1 > hullvertidx2 && iterLower.GetRound()==iterUpper.GetRound())
+				iterUpper.SetRound(iterLower.GetRound()+1);
+
+			for(; iterLower.GetRound()>=-2; --iterLower)
+			{
+				if(side_of_line<t_vec>(*iterLower, newvert, *(iterLower-1)) >= 0.)
+					break;
+			}
+
+			for(; iterUpper.GetRound()<=2; ++iterUpper)
+			{
+				if(side_of_line<t_vec>(*iterUpper, newvert, *(iterUpper+1)) <= 0.)
+					break;
+			}
+
+			std::vector<t_vec> visible;
+			for(auto iter=iterLower; iter<=iterUpper; ++iter)
+				visible.push_back(*iter);
+
+			for(std::size_t visidx=0; visidx<visible.size()-1; ++visidx)
+			{
+				// new delaunay edges connecting to newvert
+				triags.emplace_back(std::vector<t_vec>{{ visible[visidx], newvert, visible[visidx+1] }});
+			}
+
+
+			// find all conflicting triangles
+			// TODO: restrict check to triangles sharing an edge with conttriag
+			for(std::size_t confidx=0; confidx<triags.size(); ++confidx)
+			{
+				const auto& conftriag = triags[confidx];
+				if(!is_conflicting_triag<t_vec>(conftriag, newvert))
+					continue;
+
+				// TODO
+			}
 		}
 	}
 
