@@ -15,6 +15,7 @@
 #include <list>
 #include <set>
 #include <tuple>
+#include <stack>
 #include <algorithm>
 #include <limits>
 
@@ -1249,7 +1250,99 @@ requires m::is_vec<t_vec>
 }
 
 
+
 // ----------------------------------------------------------------------------
 
+
+/**
+ * finds loops in an undirected graph
+ */
+template<class t_edge = std::pair<std::size_t, std::size_t>>
+bool has_loops(const std::vector<t_edge>& edges, std::size_t start_vertex)
+{
+	std::stack<std::size_t> tovisit;
+	tovisit.push(start_vertex);
+
+	std::set<std::size_t> visited;
+
+	// visit connected vertices
+	while(!tovisit.empty())
+	{
+		std::size_t vert = tovisit.top();
+		tovisit.pop();
+
+		// has this vertex already been visited? => loop in graph
+		if(visited.find(vert) != visited.end())
+			return true;
+
+		visited.insert(vert);
+
+		std::set<std::size_t> already_in_stack;
+
+		// get all edges from current vertex, forward direction
+		for(auto iter=edges.begin(); iter!=edges.end(); ++iter)
+		{
+			if(iter->first == vert)
+			{
+				tovisit.push(iter->second);
+				already_in_stack.insert(iter->second);
+			}
+		}
+
+		// get all edges from current vertex, backward direction (needed because of undirected graph)
+		for(auto iter=edges.begin(); iter!=edges.end(); ++iter)
+		{
+			if(iter->second == vert && already_in_stack.find(vert)==already_in_stack.end())
+				tovisit.push(iter->first);
+		}
+	}
+
+	return false;
+}
+
+
+/**
+ * minimal spanning tree
+ * see: https://de.wikipedia.org/wiki/Algorithmus_von_Kruskal
+ */
+template<class t_vec>
+std::vector<std::pair<std::size_t, std::size_t>>
+min_spantree(const std::vector<t_vec>& verts,
+	const std::vector<std::pair<std::size_t, std::size_t>>& _edges)
+requires m::is_vec<t_vec>
+{
+	using t_real = typename t_vec::value_type;
+	using t_edge = std::pair<std::size_t, std::size_t>;
+
+	std::vector<t_edge> edges = _edges;
+
+	std::stable_sort(edges.begin(), edges.end(), [&verts](const t_edge& edge1, const t_edge& edge2) -> bool
+	{
+		t_vec dir1 = verts[edge1.first]-verts[edge1.second];
+		t_vec dir2 = verts[edge2.first]-verts[edge2.second];
+
+		t_real len1sq = m::inner(dir1, dir1);
+		t_real len2sq = m::inner(dir2, dir2);
+
+		return len1sq >= len2sq;
+	});
+
+
+	std::vector<t_edge> span;
+
+	while(edges.size())
+	{
+		t_edge edge = std::move(edges.back());
+		edges.pop_back();
+
+		span.push_back(edge);
+		if(has_loops<t_edge>(span, edge.first))
+			span.pop_back();
+	}
+
+	return span;
+}
+
+// ----------------------------------------------------------------------------
 
 #endif

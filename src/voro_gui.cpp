@@ -553,6 +553,12 @@ void HullView::UpdateDelaunay()
 			}
 		}
 	}
+
+
+	/*std::vector<t_vec> verts;
+	std::vector<std::pair<std::size_t, std::size_t>> edges;
+	std::vector<std::pair<std::size_t, std::size_t>> span =
+		min_spantree<t_vec>(verts, edges);*/
 }
 
 // ----------------------------------------------------------------------------
@@ -634,7 +640,7 @@ HullWnd::HullWnd(QWidget* pParent) : QMainWindow{pParent},
 			while(true)
 			{
 				std::ostringstream ostrVert;
-				ostrVert << "voro2d.hull.vertex_" << vertidx;
+				ostrVert << "voro2d.vertices." << vertidx;
 
 				auto vertprop = prop.get_child_optional(ostrVert.str());
 				if(!vertprop)
@@ -679,8 +685,8 @@ HullWnd::HullWnd(QWidget* pParent) : QMainWindow{pParent},
 				QPointF vertexpos = vertex->scenePos();
 
 				std::ostringstream ostrX, ostrY;
-				ostrX << "voro2d.hull.vertex_" << vertidx << ".<xmlattr>.x";
-				ostrY << "voro2d.hull.vertex_" << vertidx << ".<xmlattr>.y";
+				ostrX << "voro2d.vertices." << vertidx << ".<xmlattr>.x";
+				ostrY << "voro2d.vertices." << vertidx << ".<xmlattr>.y";
 
 				prop.put<t_real>(ostrX.str(), vertexpos.x());
 				prop.put<t_real>(ostrY.str(), vertexpos.y());
@@ -816,7 +822,7 @@ HullWnd::HullWnd(QWidget* pParent) : QMainWindow{pParent},
 	menuBack->addAction(actionHullDivide);
 	menuBack->addSeparator()->setText("Delaunay");
 	menuBack->addAction(actionDelaunayQHull);
-	//menuBack->addAction(actionDelaunayInc);
+	menuBack->addAction(actionDelaunayInc);
 	menuBack->addAction(actionDelaunayPara);
 
 
