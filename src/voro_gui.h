@@ -64,11 +64,13 @@ public:
 	void SetCalculateVoronoiVertices(bool b);
 	void SetCalculateVoronoiRegions(bool b);
 	void SetCalculateDelaunay(bool b);
+	void SetCalculateKruskal(bool b);
 
 	bool GetCalculateHull() const { return m_calchull; }
 	bool GetCalculateVoronoiVertices() const { return m_calcvoronoivertices; }
 	bool GetCalculateVoronoiRegions() const { return m_calcvoronoiregions; }
 	bool GetCalculateDelaunay() const { return m_calcdelaunay; }
+	bool GetCalculateKruskal() const { return m_calckruskal; }
 
 	void SetHullCalculationMethod(HullCalculationMethod m);
 	void SetDelaunayCalculationMethod(DelaunayCalculationMethod m);
@@ -102,6 +104,7 @@ private:
 	bool m_calcvoronoivertices = false;
 	bool m_calcvoronoiregions = true;
 	bool m_calcdelaunay = true;
+	bool m_calckruskal = true;
 
 	HullCalculationMethod m_hullcalculationmethod = HullCalculationMethod::QHULL;
 	DelaunayCalculationMethod m_delaunaycalculationmethod = DelaunayCalculationMethod::QHULL;

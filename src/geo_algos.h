@@ -1255,45 +1255,101 @@ requires m::is_vec<t_vec>
 
 
 /**
+ * get all edges from a delaunay triangulation
+ */
+template<class t_vec, class t_edge = std::pair<std::size_t, std::size_t>, class t_real = typename t_vec::value_type>
+std::vector<t_edge>
+get_edges(const std::vector<t_vec>& verts, const std::vector<std::vector<t_vec>>& triags, t_real eps)
+{
+	auto get_vert_idx = [&verts, eps](const t_vec& vert) -> std::optional<std::size_t>
+	{
+		for(std::size_t vertidx=0; vertidx<verts.size(); ++vertidx)
+		{
+			const t_vec& vert2 = verts[vertidx];
+			if(m::equals<t_vec>(vert, vert2, eps))
+				return vertidx;
+		}
+
+		return std::nullopt;
+	};
+
+
+	std::vector<t_edge> edges;
+
+	for(std::size_t vertidx=0; vertidx<verts.size(); ++vertidx)
+	{
+		const t_vec& vert = verts[vertidx];
+
+		for(const auto& triag : triags)
+		{
+			for(std::size_t i=0; i<triag.size(); ++i)
+			{
+				const t_vec& triagvert = triag[i];
+
+				if(m::equals<t_vec>(vert, triagvert, eps))
+				{
+					const t_vec& vert2 = triag[(i+1) % triag.size()];
+					const t_vec& vert3 = triag[(i+2) % triag.size()];
+
+					std::size_t vert2idx = *get_vert_idx(vert2);
+					std::size_t vert3idx = *get_vert_idx(vert3);
+
+					edges.push_back(std::make_pair(vertidx, vert2idx));
+					edges.push_back(std::make_pair(vertidx, vert3idx));
+
+					//std::cout << vert2idx << " -> " << vertidx << " -> " << vert3idx << std::endl;
+				}
+			}
+		}
+	}
+
+	return edges;
+}
+
+
+/**
  * finds loops in an undirected graph
  */
 template<class t_edge = std::pair<std::size_t, std::size_t>>
-bool has_loops(const std::vector<t_edge>& edges, std::size_t start_vertex)
+bool has_loops(const std::vector<t_edge>& edges, std::size_t start_from, std::size_t start_to)
 {
-	std::stack<std::size_t> tovisit;
-	tovisit.push(start_vertex);
+	// [from, to]
+	std::stack<t_edge> tovisit;
+	tovisit.push(std::make_pair(start_from, start_to));
 
-	std::set<std::size_t> visited;
+	std::set<std::size_t> visitedverts;
+	visitedverts.insert(start_from);
+
+	std::set<t_edge> visitededges;
 
 	// visit connected vertices
 	while(!tovisit.empty())
 	{
-		std::size_t vert = tovisit.top();
+		auto topedge = tovisit.top();
+		auto [vertfrom, vertto] = topedge;
 		tovisit.pop();
 
+		if(visitededges.find(topedge) != visitededges.end())
+			continue;
+
+		visitededges.insert(std::make_pair(vertfrom, vertto));
+		visitededges.insert(std::make_pair(vertto, vertfrom));
+
 		// has this vertex already been visited? => loop in graph
-		if(visited.find(vert) != visited.end())
+		if(visitedverts.find(vertto) != visitedverts.end())
 			return true;
 
-		visited.insert(vert);
+		visitedverts.insert(vertto);
 
-		std::set<std::size_t> already_in_stack;
-
-		// get all edges from current vertex, forward direction
+		// get all edges from current vertex
 		for(auto iter=edges.begin(); iter!=edges.end(); ++iter)
 		{
-			if(iter->first == vert)
-			{
-				tovisit.push(iter->second);
-				already_in_stack.insert(iter->second);
-			}
-		}
-
-		// get all edges from current vertex, backward direction (needed because of undirected graph)
-		for(auto iter=edges.begin(); iter!=edges.end(); ++iter)
-		{
-			if(iter->second == vert && already_in_stack.find(vert)==already_in_stack.end())
-				tovisit.push(iter->first);
+			// forward direction
+			if(iter->first == vertto)
+				tovisit.push(std::make_pair(iter->first, iter->second));
+			// backward direction
+			if(iter->second == vertto)
+				tovisit.push(std::make_pair(iter->second, iter->first));
 		}
 	}
 
@@ -1336,7 +1392,7 @@ requires m::is_vec<t_vec>
 		edges.pop_back();
 
 		span.push_back(edge);
-		if(has_loops<t_edge>(span, edge.first))
+		if(has_loops<t_edge>(span, edge.first, edge.second))
 			span.pop_back();
 	}
 

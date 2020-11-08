@@ -254,6 +254,13 @@ void HullView::SetCalculateDelaunay(bool b)
 }
 
 
+void HullView::SetCalculateKruskal(bool b)
+{
+	m_calckruskal = b;
+	UpdateDelaunay();
+}
+
+
 void HullView::SetHullCalculationMethod(HullCalculationMethod m)
 {
 	m_hullcalculationmethod = m;
@@ -383,7 +390,9 @@ void HullView::UpdateDelaunay()
 	m_voronoi.clear();
 
 
-	if((!m_calcdelaunay && !m_calcvoronoivertices && !m_calcvoronoiregions) || m_vertices.size() < 4)
+	if((!m_calcdelaunay && !m_calckruskal
+		&& !m_calcvoronoivertices && !m_calcvoronoiregions)
+		|| m_vertices.size() < 4)
 		return;
 
 	std::vector<t_vec> vertices;
@@ -555,10 +564,26 @@ void HullView::UpdateDelaunay()
 	}
 
 
-	/*std::vector<t_vec> verts;
-	std::vector<std::pair<std::size_t, std::size_t>> edges;
-	std::vector<std::pair<std::size_t, std::size_t>> span =
-		min_spantree<t_vec>(verts, edges);*/
+	if(m_calckruskal)
+	{
+		QPen penKruskal;
+		penKruskal.setStyle(Qt::SolidLine);
+		penKruskal.setWidthF(2.);
+		penKruskal.setColor(QColor::fromRgbF(0.,0.7,0.));
+
+		auto edges = get_edges(vertices, triags, g_eps);
+		auto span = min_spantree<t_vec>(vertices, edges);
+
+		for(const auto& spanedge : span)
+		{
+			const t_vec& vert1 = vertices[spanedge.first];
+			const t_vec& vert2 = vertices[spanedge.second];
+
+			QLineF line{QPointF{vert1[0], vert1[1]}, QPointF{vert2[0], vert2[1]}};
+			QGraphicsItem *item = m_scene->addLine(line, penKruskal);
+			m_delaunay.insert(item);
+		}
+	}
 }
 
 // ----------------------------------------------------------------------------
@@ -600,6 +625,8 @@ HullWnd::HullWnd(QWidget* pParent) : QMainWindow{pParent},
 		settings.value("calc_voronoiregions", m_view->GetCalculateVoronoiRegions()).toBool());
 	m_view->SetCalculateDelaunay(
 		settings.value("calc_delaunay", m_view->GetCalculateDelaunay()).toBool());
+	m_view->SetCalculateKruskal(
+		settings.value("calc_kruskal", m_view->GetCalculateKruskal()).toBool());
 	// ------------------------------------------------------------------------
 
 
@@ -742,6 +769,12 @@ HullWnd::HullWnd(QWidget* pParent) : QMainWindow{pParent},
 	connect(actionDelaunay, &QAction::toggled, [this](bool b)
 		{ m_view->SetCalculateDelaunay(b); });
 
+	QAction *actionSpanTree = new QAction{"Minimum Spanning Tree", this};
+	actionSpanTree->setCheckable(true);
+	actionSpanTree->setChecked(m_view->GetCalculateKruskal());
+	connect(actionSpanTree, &QAction::toggled, [this](bool b)
+	{ m_view->SetCalculateKruskal(b); });
+
 
 	QAction *actionHullQHull = new QAction{"QHull", this};
 	actionHullQHull->setCheckable(true);
@@ -814,6 +847,7 @@ HullWnd::HullWnd(QWidget* pParent) : QMainWindow{pParent},
 	menuCalc->addAction(actionVoronoiRegions);
 	menuCalc->addSeparator();
 	menuCalc->addAction(actionDelaunay);
+	menuCalc->addAction(actionSpanTree);
 
 	menuBack->addSeparator()->setText("Convex Hull");
 	menuBack->addAction(actionHullQHull);
@@ -865,6 +899,7 @@ void HullWnd::closeEvent(QCloseEvent *e)
 	settings.setValue("calc_voronoivertices", m_view->GetCalculateVoronoiVertices());
 	settings.setValue("calc_voronoiregions", m_view->GetCalculateVoronoiRegions());
 	settings.setValue("calc_delaunay", m_view->GetCalculateDelaunay());
+	settings.setValue("calc_kruskal", m_view->GetCalculateKruskal());
 	// ------------------------------------------------------------------------
 
 	QMainWindow::closeEvent(e);
