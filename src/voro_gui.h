@@ -104,7 +104,7 @@ private:
 	bool m_calcvoronoivertices = false;
 	bool m_calcvoronoiregions = true;
 	bool m_calcdelaunay = true;
-	bool m_calckruskal = true;
+	bool m_calckruskal = false;
 
 	HullCalculationMethod m_hullcalculationmethod = HullCalculationMethod::QHULL;
 	DelaunayCalculationMethod m_delaunaycalculationmethod = DelaunayCalculationMethod::QHULL;

@@ -942,7 +942,6 @@ requires m::is_vec<t_vec>
 
 /**
  * iterative delaunay triangulation
- * TODO: does not yet work
  */
 template<class t_vec, class t_real = typename t_vec::value_type>
 std::tuple<std::vector<t_vec>, std::vector<std::vector<t_vec>>, std::vector<std::set<std::size_t>>>
@@ -966,12 +965,23 @@ requires m::is_vec<t_vec>
 
 
 	// returns [triangle index, shared index 1, shared index 2, nonshared index]
-	auto get_triag_sharing_edge = [&triags, eps](const t_vec& vert1, const t_vec& vert2)
+	auto get_triag_sharing_edge = [&triags, eps](const t_vec& vert1, const t_vec& vert2, const t_vec& notcontaining)
 		-> std::optional<std::tuple<std::size_t, std::size_t, std::size_t, std::size_t>>
 	{
 		for(std::size_t i=0; i<triags.size(); ++i)
 		{
+			bool nexttriag = false;
 			const auto& triag = triags[i];
+			for(const t_vec& vert : triag)
+			{
+				if(m::equals<t_vec>(vert, notcontaining, eps))
+				{
+					nexttriag = true;
+					break;
+				}
+			}
+			if(nexttriag)
+				continue;
 
 			// test all edge combinations
 			if(m::equals<t_vec>(triag[0], vert1, eps) && m::equals<t_vec>(triag[1], vert2, eps))
@@ -997,10 +1007,13 @@ requires m::is_vec<t_vec>
 	for(std::size_t newvertidx=3; newvertidx<verts.size(); ++newvertidx)
 	{
 		const t_vec& newvert = verts[newvertidx];
+		std::cout << "newvert " << newvertidx-3 << ": " << newvert << std::endl;
 
 		// find triangle containing the new vertex
 		if(auto optidx = get_containing_triag<t_vec>(triags, newvert); optidx)
 		{
+			std::cout << "inside" << std::endl;
+
 			auto conttriag = std::move(triags[*optidx]);
 			triags.erase(triags.begin() + *optidx);
 
@@ -1060,13 +1073,17 @@ requires m::is_vec<t_vec>
 				// replace conflicting triangle
 				triags[*sharedtriagidx] = std::vector<t_vec>{{ newvert, conftriag[idxnotshared], conftriag[idxshared2] }};
 				triags[confidx] = std::vector<t_vec>{{ newvert, conftriag[idxnotshared], conftriag[idxshared1] }};
+
+				// TODO: also check neighbours of newly created triangles for conflicts
 			}
 		}
 
 		// new vertex is outside of any triangle
 		else
 		{
+			std::cout << "outside" << std::endl;
 			auto hull = calc_hull_iterative_bintree<t_vec>(curverts, eps);
+			std::tie(hull, std::ignore) = sort_vertices_by_angle<t_vec>(hull);
 
 			// find the points in the hull visible from newvert
 			std::vector<t_vec> visible;
@@ -1099,32 +1116,36 @@ requires m::is_vec<t_vec>
 				}
 
 				for(auto iter=iterLower; iter<=iterUpper; ++iter)
+				{
+					std::cout << "vis: " << *iter << std::endl;
 					visible.push_back(*iter);
+				}
 			}
 
 			for(std::size_t visidx=0; visidx<visible.size()-1; ++visidx)
 			{
+				triags.emplace_back(std::vector<t_vec>{{ newvert, visible[visidx], visible[visidx+1] }});
+				std::size_t newtriag = triags.size()-1;
+
 				// get triangle on other side of shared edge
-				auto optother = get_triag_sharing_edge(visible[visidx], visible[visidx+1]);
+				auto optother = get_triag_sharing_edge(visible[visidx], visible[visidx+1], newvert);
 				if(!optother)
 					continue;
 				const auto [othertriag, sharedidx1, sharedidx2, nonsharedidx] = *optother;
 
-				if(!is_conflicting_triag<t_vec>(triags[othertriag], newvert))
+				if(is_conflicting_triag<t_vec>(triags[othertriag], newvert))
 				{
-					// new delaunay edges connecting to newvert
-					triags.emplace_back(std::vector<t_vec>{{ newvert, visible[visidx], visible[visidx+1] }});
-				}
-				else
-				{
-					triags.emplace_back(std::vector<t_vec>
-						{{ newvert, triags[othertriag][nonsharedidx], triags[othertriag][sharedidx1] }});
+					triags[newtriag] = std::vector<t_vec>
+						{{ newvert, triags[othertriag][nonsharedidx], triags[othertriag][sharedidx1] }};
 					triags[othertriag] = std::vector<t_vec>
 						{{ newvert, triags[othertriag][nonsharedidx], triags[othertriag][sharedidx2] }};
+
+					// TODO: also check neighbours of newly created triangles for conflicts
 				}
 			}
 		}
 
+		std::cout << "----------------------------------------" << std::endl;
 		curverts.push_back(newvert);
 	}
 
