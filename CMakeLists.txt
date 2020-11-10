@@ -44,6 +44,15 @@ target_link_libraries(voro
 )
 
 
+add_executable(vis
+	src/vis_gui.cpp src/vis_gui.h
+	src/geo_algos.h src/math_algos.h
+)
+
+target_link_libraries(vis
+	Qt5::Core Qt5::Gui Qt5::Widgets Qt5::Svg
+)
+
 
 add_executable(caster
 	src/caster_gui.cpp src/caster_gui.h
