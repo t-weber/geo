@@ -941,6 +941,86 @@ requires m::is_vec<t_vec>
 
 
 /**
+ * @returns [triangle index, shared index 1, shared index 2, nonshared index]
+ */
+template<class t_vec, class t_real = typename t_vec::value_type>
+std::optional<std::tuple<std::size_t, std::size_t, std::size_t, std::size_t>>
+get_triag_sharing_edge(std::vector<std::vector<t_vec>>& triags,
+	const t_vec& vert1, const t_vec& vert2, std::size_t curtriagidx, t_real eps = 1e-5)
+requires m::is_vec<t_vec>
+{
+	for(std::size_t i=0; i<triags.size(); ++i)
+	{
+		if(i == curtriagidx)
+			continue;
+
+		const auto& triag = triags[i];
+
+		// test all edge combinations
+		if(m::equals<t_vec>(triag[0], vert1, eps) && m::equals<t_vec>(triag[1], vert2, eps))
+			return std::make_tuple(i, 0, 1, 2);
+		if(m::equals<t_vec>(triag[1], vert1, eps) && m::equals<t_vec>(triag[0], vert2, eps))
+			return std::make_tuple(i, 1, 0, 2);
+		if(m::equals<t_vec>(triag[0], vert1, eps) && m::equals<t_vec>(triag[2], vert2, eps))
+			return std::make_tuple(i, 0, 2, 1);
+		if(m::equals<t_vec>(triag[2], vert1, eps) && m::equals<t_vec>(triag[0], vert2, eps))
+			return std::make_tuple(i, 2, 0, 1);
+		if(m::equals<t_vec>(triag[1], vert1, eps) && m::equals<t_vec>(triag[2], vert2, eps))
+			return std::make_tuple(i, 1, 2, 0);
+		if(m::equals<t_vec>(triag[2], vert1, eps) && m::equals<t_vec>(triag[1], vert2, eps))
+			return std::make_tuple(i, 2, 1, 0);
+	}
+
+	// no shared edge found
+	return std::nullopt;
+}
+
+
+template<class t_vec, class t_real = typename t_vec::value_type>
+void flip_edge(std::vector<std::vector<t_vec>>& triags,
+	std::size_t triagidx, std::size_t nonsharedidx, t_real eps = 1e-5)
+requires m::is_vec<t_vec>
+{
+	std::size_t sharedidx1 = (nonsharedidx+1) % triags[triagidx].size();
+	std::size_t sharedidx2 = (nonsharedidx+2) % triags[triagidx].size();
+
+	// get triangle on other side of shared edge
+	auto optother = get_triag_sharing_edge(
+		triags, triags[triagidx][sharedidx1], triags[triagidx][sharedidx2], triagidx, eps);
+	if(!optother)
+		return;
+	const auto [othertriagidx, othersharedidx1, othersharedidx2, othernonsharedidx] = *optother;
+
+	if(is_conflicting_triag<t_vec>(triags[othertriagidx], triags[triagidx][nonsharedidx]))
+	{
+		triags[triagidx] = std::vector<t_vec>
+		{{
+			triags[triagidx][nonsharedidx],
+			triags[othertriagidx][othernonsharedidx],
+			triags[othertriagidx][othersharedidx1]
+		}};
+
+		triags[othertriagidx] = std::vector<t_vec>
+		{{
+			triags[triagidx][nonsharedidx],
+			triags[othertriagidx][othernonsharedidx],
+			triags[othertriagidx][othersharedidx2]
+		}};
+
+		// also check neighbours of newly created triangles for conflicts
+		flip_edge(triags, othertriagidx, othernonsharedidx, eps);
+		flip_edge(triags, othertriagidx, othersharedidx1, eps);
+		flip_edge(triags, othertriagidx, othersharedidx2, eps);
+
+		flip_edge(triags, triagidx, nonsharedidx, eps);
+		flip_edge(triags, triagidx, sharedidx1, eps);
+		flip_edge(triags, triagidx, sharedidx2, eps);
+	}
+}
+
+
+
+/**
  * iterative delaunay triangulation
  */
 template<class t_vec, class t_real = typename t_vec::value_type>
@@ -963,56 +1043,16 @@ requires m::is_vec<t_vec>
 	// currently inserted vertices
 	std::vector<t_vec> curverts{{ verts[0], verts[1], verts[2] }};
 
-
-	// returns [triangle index, shared index 1, shared index 2, nonshared index]
-	auto get_triag_sharing_edge = [&triags, eps](const t_vec& vert1, const t_vec& vert2, const t_vec& notcontaining)
-		-> std::optional<std::tuple<std::size_t, std::size_t, std::size_t, std::size_t>>
-	{
-		for(std::size_t i=0; i<triags.size(); ++i)
-		{
-			bool nexttriag = false;
-			const auto& triag = triags[i];
-			for(const t_vec& vert : triag)
-			{
-				if(m::equals<t_vec>(vert, notcontaining, eps))
-				{
-					nexttriag = true;
-					break;
-				}
-			}
-			if(nexttriag)
-				continue;
-
-			// test all edge combinations
-			if(m::equals<t_vec>(triag[0], vert1, eps) && m::equals<t_vec>(triag[1], vert2, eps))
-				return std::make_tuple(i, 0, 1, 2);
-			if(m::equals<t_vec>(triag[1], vert1, eps) && m::equals<t_vec>(triag[0], vert2, eps))
-				return std::make_tuple(i, 1, 0, 2);
-			if(m::equals<t_vec>(triag[0], vert1, eps) && m::equals<t_vec>(triag[2], vert2, eps))
-				return std::make_tuple(i, 0, 2, 1);
-			if(m::equals<t_vec>(triag[2], vert1, eps) && m::equals<t_vec>(triag[0], vert2, eps))
-				return std::make_tuple(i, 2, 0, 1);
-			if(m::equals<t_vec>(triag[1], vert1, eps) && m::equals<t_vec>(triag[2], vert2, eps))
-				return std::make_tuple(i, 1, 2, 0);
-			if(m::equals<t_vec>(triag[2], vert1, eps) && m::equals<t_vec>(triag[1], vert2, eps))
-				return std::make_tuple(i, 2, 1, 0);
-		}
-
-		// no shared edge found
-		return std::nullopt;
-	};
-
-
 	// insert vertices iteratively
 	for(std::size_t newvertidx=3; newvertidx<verts.size(); ++newvertidx)
 	{
 		const t_vec& newvert = verts[newvertidx];
-		std::cout << "newvert " << newvertidx-3 << ": " << newvert << std::endl;
+		//std::cout << "newvert " << newvertidx-3 << ": " << newvert << std::endl;
 
 		// find triangle containing the new vertex
 		if(auto optidx = get_containing_triag<t_vec>(triags, newvert); optidx)
 		{
-			std::cout << "inside" << std::endl;
+			//std::cout << "inside" << std::endl;
 
 			auto conttriag = std::move(triags[*optidx]);
 			triags.erase(triags.begin() + *optidx);
@@ -1021,67 +1061,16 @@ requires m::is_vec<t_vec>
 			triags.emplace_back(std::vector<t_vec>{{ newvert, conttriag[0], conttriag[1] }});
 			triags.emplace_back(std::vector<t_vec>{{ newvert, conttriag[0], conttriag[2] }});
 			triags.emplace_back(std::vector<t_vec>{{ newvert, conttriag[1], conttriag[2] }});
-			std::size_t newtriagidx1 = triags.size()-3;
-			std::size_t newtriagidx2 = triags.size()-2;
-			std::size_t newtriagidx3 = triags.size()-1;
 
-
-			// find all conflicting triangles
-			// TODO: restrict check to triangles sharing an edge with conttriag
-			for(std::size_t confidx=0; confidx<triags.size(); ++confidx)
-			{
-				const auto& conftriag = triags[confidx];
-				if(!is_conflicting_triag<t_vec>(conftriag, newvert))
-					continue;
-
-				// get vertex not shared with conttriag
-				std::size_t idxnotshared;
-				for(idxnotshared=0; idxnotshared<3; ++idxnotshared)
-				{
-					if(!m::equals<t_vec>(conftriag[idxnotshared], conttriag[0], eps) &&
-						!m::equals<t_vec>(conftriag[idxnotshared], conttriag[1], eps) &&
-						!m::equals<t_vec>(conftriag[idxnotshared], conttriag[2], eps))
-						break;
-				}
-				if(idxnotshared >= 3)
-					continue;
-
-				// vertices shared with conttriag
-				std::size_t idxshared1 = (idxnotshared+1) % 3;
-				std::size_t idxshared2 = (idxnotshared+2) % 3;
-
-				// to which one of the newly created triangles does the conflicting one border?
-				std::optional<std::size_t> sharedtriagidx;
-				if((m::equals<t_vec>(conftriag[idxshared1], conttriag[0], eps) &&
-					m::equals<t_vec>(conftriag[idxshared2], conttriag[1], eps)) ||
-					(m::equals<t_vec>(conftriag[idxshared1], conttriag[1], eps) &&
-					m::equals<t_vec>(conftriag[idxshared2], conttriag[0], eps)))
-					sharedtriagidx = newtriagidx1;
-				else if((m::equals<t_vec>(conftriag[idxshared1], conttriag[0], eps) &&
-					m::equals<t_vec>(conftriag[idxshared2], conttriag[2], eps)) ||
-					(m::equals<t_vec>(conftriag[idxshared1], conttriag[2], eps) &&
-					m::equals<t_vec>(conftriag[idxshared2], conttriag[0], eps)))
-					sharedtriagidx = newtriagidx2;
-				else if((m::equals<t_vec>(conftriag[idxshared1], conttriag[1], eps) &&
-					m::equals<t_vec>(conftriag[idxshared2], conttriag[2], eps)) ||
-					(m::equals<t_vec>(conftriag[idxshared1], conttriag[2], eps) &&
-					m::equals<t_vec>(conftriag[idxshared2], conttriag[1], eps)))
-					sharedtriagidx = newtriagidx3;
-				if(!sharedtriagidx)
-					continue;
-
-				// replace conflicting triangle
-				triags[*sharedtriagidx] = std::vector<t_vec>{{ newvert, conftriag[idxnotshared], conftriag[idxshared2] }};
-				triags[confidx] = std::vector<t_vec>{{ newvert, conftriag[idxnotshared], conftriag[idxshared1] }};
-
-				// TODO: also check neighbours of newly created triangles for conflicts
-			}
+			flip_edge(triags, triags.size()-3, 0, eps);
+			flip_edge(triags, triags.size()-2, 0, eps);
+			flip_edge(triags, triags.size()-1, 0, eps);
 		}
 
 		// new vertex is outside of any triangle
 		else
 		{
-			std::cout << "outside" << std::endl;
+			//std::cout << "outside" << std::endl;
 			auto hull = calc_hull_iterative_bintree<t_vec>(curverts, eps);
 			std::tie(hull, std::ignore) = sort_vertices_by_angle<t_vec>(hull);
 
@@ -1117,7 +1106,7 @@ requires m::is_vec<t_vec>
 
 				for(auto iter=iterLower; iter<=iterUpper; ++iter)
 				{
-					std::cout << "vis: " << *iter << std::endl;
+					//std::cout << "vis: " << *iter << std::endl;
 					visible.push_back(*iter);
 				}
 			}
@@ -1125,29 +1114,37 @@ requires m::is_vec<t_vec>
 			for(std::size_t visidx=0; visidx<visible.size()-1; ++visidx)
 			{
 				triags.emplace_back(std::vector<t_vec>{{ newvert, visible[visidx], visible[visidx+1] }});
-				std::size_t newtriag = triags.size()-1;
-
-				// get triangle on other side of shared edge
-				auto optother = get_triag_sharing_edge(visible[visidx], visible[visidx+1], newvert);
-				if(!optother)
-					continue;
-				const auto [othertriag, sharedidx1, sharedidx2, nonsharedidx] = *optother;
-
-				if(is_conflicting_triag<t_vec>(triags[othertriag], newvert))
-				{
-					triags[newtriag] = std::vector<t_vec>
-						{{ newvert, triags[othertriag][nonsharedidx], triags[othertriag][sharedidx1] }};
-					triags[othertriag] = std::vector<t_vec>
-						{{ newvert, triags[othertriag][nonsharedidx], triags[othertriag][sharedidx2] }};
-
-					// TODO: also check neighbours of newly created triangles for conflicts
-				}
+				flip_edge(triags, triags.size()-1, 0, eps);
 			}
 		}
 
-		std::cout << "----------------------------------------" << std::endl;
+		//std::cout << "----------------------------------------" << std::endl;
 		curverts.push_back(newvert);
 	}
+
+
+	// find neighbouring triangles and voronoi vertices
+	neighbours.resize(triags.size());
+
+	for(std::size_t triagidx=0; triagidx<triags.size(); ++triagidx)
+	{
+		// sort vertices
+		auto& triag = triags[triagidx];
+		std::tie(triag, std::ignore) = sort_vertices_by_angle<t_vec>(triag);
+
+		// voronoi vertices
+		voronoi.emplace_back(calc_circumcentre<t_vec>(triag));
+
+		// neighbouring triangle indices
+		auto optother1 = get_triag_sharing_edge(triags, triags[triagidx][0], triags[triagidx][1], triagidx, eps);
+		auto optother2 = get_triag_sharing_edge(triags, triags[triagidx][0], triags[triagidx][2], triagidx, eps);
+		auto optother3 = get_triag_sharing_edge(triags, triags[triagidx][1], triags[triagidx][2], triagidx, eps);
+
+		if(optother1) neighbours[triagidx].insert(std::get<0>(*optother1));
+		if(optother2) neighbours[triagidx].insert(std::get<0>(*optother2));
+		if(optother3) neighbours[triagidx].insert(std::get<0>(*optother3));
+	}
+
 
 	return std::make_tuple(voronoi, triags, neighbours);
 }
