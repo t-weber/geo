@@ -27,14 +27,6 @@
 #include <boost/property_tree/xml_parser.hpp>
 namespace ptree = boost::property_tree;
 
-#include "geo_algos.h"
-
-using t_real = double;
-using t_vec = m::vec<t_real, std::vector>;
-using t_mat = m::mat<t_real, std::vector>;
-
-const t_real g_eps = 1e-5;
-
 
 
 // ----------------------------------------------------------------------------
@@ -113,7 +105,7 @@ void VisView::resizeEvent(QResizeEvent *evt)
 	const double padding = 16;
 
 	// include bounds given by vertices
-	for(const Vertex* vertex : m_vertices)
+	for(const Vertex* vertex : m_elems_vertices)
 	{
 		QPointF vertexpos = vertex->scenePos();
 
@@ -135,7 +127,7 @@ void VisView::resizeEvent(QResizeEvent *evt)
 void VisView::AddVertex(const QPointF& pos)
 {
 	Vertex *vertex = new Vertex{pos};
-	m_vertices.push_back(vertex);
+	m_elems_vertices.push_back(vertex);
 	m_scene->addItem(vertex);
 }
 
@@ -152,8 +144,8 @@ void VisView::mousePressEvent(QMouseEvent *evt)
 	for(int itemidx=0; itemidx<items.size(); ++itemidx)
 	{
 		item = items[itemidx];
-		auto iter = std::find(m_vertices.begin(), m_vertices.end(), static_cast<Vertex*>(item));
-		item_is_vertex = (iter != m_vertices.end());
+		auto iter = std::find(m_elems_vertices.begin(), m_elems_vertices.end(), static_cast<Vertex*>(item));
+		item_is_vertex = (iter != m_elems_vertices.end());
 		if(item_is_vertex)
 			break;
 	}
@@ -188,9 +180,9 @@ void VisView::mousePressEvent(QMouseEvent *evt)
 		if(item && item_is_vertex)
 		{
 			m_scene->removeItem(item);
-			auto iter = std::find(m_vertices.begin(), m_vertices.end(), static_cast<Vertex*>(item));
-			if(iter != m_vertices.end())
-				iter = m_vertices.erase(iter);
+			auto iter = std::find(m_elems_vertices.begin(), m_elems_vertices.end(), static_cast<Vertex*>(item));
+			if(iter != m_elems_vertices.end())
+				iter = m_elems_vertices.erase(iter);
 			delete item;
 			UpdateAll();
 		}
@@ -229,12 +221,12 @@ void VisView::mouseMoveEvent(QMouseEvent *evt)
 
 void VisView::ClearVertices()
 {
-	for(Vertex* vertex : m_vertices)
+	for(Vertex* vertex : m_elems_vertices)
 	{
 		m_scene->removeItem(vertex);
 		delete vertex;
 	}
-	m_vertices.clear();
+	m_elems_vertices.clear();
 
 	UpdateAll();
 }
@@ -242,19 +234,28 @@ void VisView::ClearVertices()
 
 void VisView::UpdateAll()
 {
+	// get vertices
+	m_vertices.clear();
+	m_vertices.reserve(m_elems_vertices.size());
+	std::transform(m_elems_vertices.begin(), m_elems_vertices.end(), std::back_inserter(m_vertices),
+		[](const Vertex* vert) -> t_vec { return m::create<t_vec>({vert->x(), vert->y()}); } );
+
+	std::tie(m_vertices, std::ignore) = sort_vertices_by_angle<t_vec>(m_vertices);
+
 	UpdateEdges();
+	UpdateKer();
 }
 
 
 void VisView::UpdateEdges()
 {
 	// remove previous edges
-	for(QGraphicsItem* item : m_edges)
+	for(QGraphicsItem* item : m_elems_edges)
 	{
 		m_scene->removeItem(item);
 		delete item;
 	}
-	m_edges.clear();
+	m_elems_edges.clear();
 
 
 	QPen penEdge;
@@ -267,12 +268,45 @@ void VisView::UpdateEdges()
 	{
 		std::size_t vertidx2 = (vertidx+1) % m_vertices.size();
 
-		const auto* vertex1 = m_vertices[vertidx];
-		const auto* vertex2 = m_vertices[vertidx2];
+		const t_vec& vertex1 = m_vertices[vertidx];
+		const t_vec& vertex2 = m_vertices[vertidx2];
 
-		QLineF line{vertex1->pos(), vertex2->pos()};
+		QLineF line{QPointF{vertex1[0], vertex1[1]}, QPointF{vertex2[0], vertex2[1]}};
 		QGraphicsItem *item = m_scene->addLine(line, penEdge);
-		m_edges.push_back(item);
+		m_elems_edges.push_back(item);
+	}
+}
+
+
+void VisView::UpdateKer()
+{
+	// remove previous vis poly
+	for(QGraphicsItem* item : m_elems_ker)
+	{
+		m_scene->removeItem(item);
+		delete item;
+	}
+	m_elems_ker.clear();
+
+
+	auto kerpoly = calc_ker<t_vec>(m_vertices);
+
+
+	QPen penKer;
+	penKer.setStyle(Qt::SolidLine);
+	penKer.setWidthF(2.);
+	penKer.setColor(QColor::fromRgbF(1., 0., 0.));
+
+	for(std::size_t vertidx = 0; vertidx < kerpoly.size(); ++vertidx)
+	{
+		std::size_t vertidx2 = (vertidx+1) % kerpoly.size();
+
+		const t_vec& vertex1 = kerpoly[vertidx];
+		const t_vec& vertex2 = kerpoly[vertidx2];
+
+		QLineF line{QPointF{vertex1[0], vertex1[1]}, QPointF{vertex2[0], vertex2[1]}};
+		QGraphicsItem *item = m_scene->addLine(line, penKer);
+		m_elems_ker.push_back(item);
 	}
 }
 
@@ -387,7 +421,7 @@ VisWnd::VisWnd(QWidget* pParent) : QMainWindow{pParent},
 			ptree::ptree prop{};
 
 			std::size_t vertidx = 0;
-			for(const Vertex* vertex : m_view->GetVertices())
+			for(const Vertex* vertex : m_view->GetVertexElems())
 			{
 				QPointF vertexpos = vertex->scenePos();
 

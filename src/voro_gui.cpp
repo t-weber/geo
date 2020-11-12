@@ -33,7 +33,7 @@ using t_real = double;
 using t_vec = m::vec<t_real, std::vector>;
 using t_mat = m::mat<t_real, std::vector>;
 
-const t_real g_eps = 1e-5;
+const constexpr t_real g_eps = 1e-5;
 
 
 //#define HULL_CHECK
@@ -395,6 +395,8 @@ void HullView::UpdateDelaunay()
 		|| m_vertices.size() < 4)
 		return;
 
+
+	// get vertices
 	std::vector<t_vec> vertices;
 	vertices.reserve(m_vertices.size());
 	std::transform(m_vertices.begin(), m_vertices.end(), std::back_inserter(vertices),
@@ -572,7 +574,7 @@ void HullView::UpdateDelaunay()
 		penKruskal.setColor(QColor::fromRgbF(0.,0.7,0.));
 
 		auto edges = get_edges(vertices, triags, g_eps);
-		auto span = min_spantree<t_vec>(vertices, edges);
+		auto span = calc_min_spantree<t_vec>(vertices, edges);
 
 		for(const auto& spanedge : span)
 		{

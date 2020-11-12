@@ -82,6 +82,16 @@ requires m::is_vec<t_vec>
 }
 
 
+template<class t_vec, class t_real=typename t_vec::value_type>
+t_real line_angle(const t_vec& line1vert1, const t_vec& line1vert2,
+	const t_vec& line2vert1, const t_vec& line2vert2)
+requires m::is_vec<t_vec>
+{
+	return line_angle<t_vec, t_real>(line2vert1, line2vert2)
+		- line_angle<t_vec, t_real>(line1vert1, line1vert2);
+}
+
+
 /**
  * returns > 0 if point is on the left-hand side of line
  */
@@ -1275,7 +1285,9 @@ requires m::is_vec<t_vec>
 /**
  * get all edges from a delaunay triangulation
  */
-template<class t_vec, class t_edge = std::pair<std::size_t, std::size_t>, class t_real = typename t_vec::value_type>
+template<class t_vec,
+	class t_edge = std::pair<std::size_t, std::size_t>,
+	class t_real = typename t_vec::value_type>
 std::vector<t_edge>
 get_edges(const std::vector<t_vec>& verts, const std::vector<std::vector<t_vec>>& triags, t_real eps)
 {
@@ -1379,14 +1391,12 @@ bool has_loops(const std::vector<t_edge>& edges, std::size_t start_from, std::si
  * minimal spanning tree
  * see: https://de.wikipedia.org/wiki/Algorithmus_von_Kruskal
  */
-template<class t_vec>
-std::vector<std::pair<std::size_t, std::size_t>>
-min_spantree(const std::vector<t_vec>& verts,
-	const std::vector<std::pair<std::size_t, std::size_t>>& _edges)
+template<class t_vec, class t_edge = std::pair<std::size_t, std::size_t>>
+std::vector<t_edge>
+calc_min_spantree(const std::vector<t_vec>& verts, const std::vector<t_edge>& _edges)
 requires m::is_vec<t_vec>
 {
 	using t_real = typename t_vec::value_type;
-	using t_edge = std::pair<std::size_t, std::size_t>;
 
 	std::vector<t_edge> edges = _edges;
 
@@ -1416,6 +1426,70 @@ requires m::is_vec<t_vec>
 
 	return span;
 }
+
+
+
+// ----------------------------------------------------------------------------
+
+
+
+/**
+ * kernel of a polygon
+ */
+template<class t_vec>
+std::vector<t_vec>
+calc_ker(const std::vector<t_vec>& verts)
+requires m::is_vec<t_vec>
+{
+	using t_real = typename t_vec::value_type;
+	using t_edge = std::pair<std::size_t, std::size_t>;
+
+	std::vector<t_vec> ker;
+
+	if(verts.size() < 3)
+		return ker;
+
+
+	std::vector<t_edge> edgesFwd{{std::make_pair(0,1)}};
+	std::vector<t_edge> edgesBwd{{std::make_pair(verts.size()-1, verts.size()-2)}};
+
+	t_real last_angle = 0.;
+	for(std::size_t vertidx=1; vertidx<verts.size()-1; ++vertidx)
+	{
+		std::size_t vertidxPrev = (vertidx-1) % verts.size();
+		std::size_t vertidxNext = (vertidx+1) % verts.size();
+		const t_vec& vert0 = verts[vertidxPrev];
+		const t_vec& vert1 = verts[vertidx];
+		const t_vec& vert2 = verts[vertidxNext];
+
+		t_real angle = line_angle<t_vec>(vert0, vert1, vert1, vert2);
+		if(angle > last_angle)
+			edgesFwd.push_back(std::make_pair(vertidx, vertidxNext));
+		last_angle = angle;
+	}
+
+	last_angle = 0.;
+	for(std::size_t vertidx=verts.size()-2; vertidx>=1; --vertidx)
+	{
+		std::size_t vertidxPrev = (vertidx+1) % verts.size();
+		std::size_t vertidxNext = (vertidx-1) % verts.size();
+		const t_vec& vert0 = verts[vertidxPrev];
+		const t_vec& vert1 = verts[vertidx];
+		const t_vec& vert2 = verts[vertidxNext];
+
+		t_real angle = line_angle<t_vec>(vert0, vert1, vert1, vert2);
+		if(angle < last_angle)
+			edgesBwd.push_back(std::make_pair(vertidx, vertidxNext));
+		last_angle = angle;
+	}
+
+
+	// TODO
+
+	return ker;
+}
+
+
 
 // ----------------------------------------------------------------------------
 

@@ -1,7 +1,7 @@
 /**
- * convex hull test program
+ * vis test program
  * @author Tobias Weber (orcid: 0000-0002-7230-1932)
- * @date 15-Aug-2020
+ * @date 11-Nov-2020
  * @license: see 'LICENSE' file
  */
 
@@ -17,6 +17,9 @@
 
 #include <memory>
 #include <vector>
+
+#include "geo_algos.h"
+using t_real = double;
 
 
 class Vertex : public QGraphicsItem
@@ -36,6 +39,13 @@ private:
 class VisView : public QGraphicsView
 {Q_OBJECT
 public:
+	using t_vec = m::vec<t_real, std::vector>;
+	using t_mat = m::mat<t_real, std::vector>;
+
+	static const constexpr t_real g_eps = 1e-5;
+
+
+public:
 	VisView(QGraphicsScene *scene=nullptr, QWidget *parent=nullptr);
 	virtual ~VisView();
 
@@ -44,10 +54,11 @@ public:
 
 	void AddVertex(const QPointF& pos);
 	void ClearVertices();
-	const std::vector<Vertex*>& GetVertices() const { return m_vertices; }
+	const std::vector<Vertex*>& GetVertexElems() const { return m_elems_vertices; }
 
 	void UpdateAll();
 	void UpdateEdges();
+	void UpdateKer();
 
 protected:
 	virtual void mousePressEvent(QMouseEvent *evt) override;
@@ -59,10 +70,12 @@ protected:
 private:
 	QGraphicsScene *m_scene = nullptr;
 
-	std::vector<Vertex*> m_vertices{};
-	std::vector<QGraphicsItem*> m_edges{};
+	std::vector<Vertex*> m_elems_vertices{};
+	std::vector<QGraphicsItem*> m_elems_edges{}, m_elems_ker{};
 
 	bool m_dragging = false;
+
+	std::vector<t_vec> m_vertices{};
 
 signals:
 	void SignalMouseCoordinates(double x, double y);
