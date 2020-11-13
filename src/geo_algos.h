@@ -1436,19 +1436,15 @@ requires m::is_vec<t_vec>
 /**
  * kernel of a polygon
  */
-template<class t_vec>
+template<class t_vec, class t_real = typename t_vec::value_type>
 std::vector<t_vec>
-calc_ker(const std::vector<t_vec>& verts)
+calc_ker(const std::vector<t_vec>& verts, t_real eps)
 requires m::is_vec<t_vec>
 {
-	using t_real = typename t_vec::value_type;
-	using t_edge = std::pair<std::size_t, std::size_t>;
-
-	std::vector<t_vec> ker;
-
 	if(verts.size() < 3)
-		return ker;
+		return std::vector<t_vec>({});
 
+	using t_edge = std::pair<std::size_t, std::size_t>;
 
 	std::vector<t_edge> edgesFwd{{std::make_pair(0,1)}};
 	std::vector<t_edge> edgesBwd{{std::make_pair(verts.size()-1, verts.size()-2)}};
@@ -1484,8 +1480,106 @@ requires m::is_vec<t_vec>
 	}
 
 
+	std::vector<t_vec> vertsFwd;
+	for(const t_edge& edge : edgesFwd)
+	{
+		const t_vec& vert1 = verts[edge.first];
+		const t_vec& vert2 = verts[edge.second];
+
+		t_real slope = (vert2[1]-vert1[1]) / (vert2[0]-vert1[0]);
+		t_real offs = vert1[1] - vert1[0]*slope;
+
+		vertsFwd.emplace_back(m::create<t_vec>({ -slope, offs }));
+	}
+
+	std::vector<t_vec> vertsBwd;
+	for(const t_edge& edge : edgesBwd)
+	{
+		const t_vec& vert1 = verts[edge.first];
+		const t_vec& vert2 = verts[edge.second];
+
+		t_real slope = (vert2[1]-vert1[1]) / (vert2[0]-vert1[0]);
+		t_real offs = vert1[1] - vert1[0]*slope;
+
+		vertsBwd.emplace_back(m::create<t_vec>({ -slope, offs }));
+	}
+
+
+	std::vector<t_vec> hullFwd = calc_hull_iterative_bintree<t_vec>(vertsFwd, eps);
+	std::vector<t_vec> hullBwd = calc_hull_iterative_bintree<t_vec>(vertsBwd, eps);
+
+
+	auto is_edge_in_hull = [eps](const t_vec& vert1, const t_vec& vert2,
+		const std::vector<t_vec>& hull) -> bool
+	{
+		for(std::size_t i=0; i<hull.size(); ++i)
+		{
+			std::size_t j = (i+1) % hull.size();
+
+			const t_vec& hullvert1 = hull[i];
+			const t_vec& hullvert2 = hull[j];
+
+			if((m::equals<t_vec>(vert1, hullvert1, eps) && m::equals<t_vec>(vert2, hullvert2, eps)))
+			{
+				t_vec dir = vert2 - vert1;
+
+				// normal pointing downwards?
+				if(-dir[0] < t_real{0})
+					return true;
+			}
+		}
+		return false;
+	};
+
+	auto get_inters = [](const t_vec& vert1, const t_vec& vert2) -> t_vec
+	{
+		t_real slope1 = -vert1[0];
+		t_real offs1 = vert1[1];
+		t_real slope2 = -vert2[0];
+		t_real offs2 = vert2[1];
+
+		// slope1*x + offs1 = slope2*x + offs2
+		// x = (offs2 - offs1) / (slope1 - slope2)
+		t_real intersX = (offs2-offs1) / (slope1-slope2);
+		t_real intersY = offs1 + slope1*intersX;
+
+		return m::create<t_vec>({intersX, intersY});
+	};
+
+
+	std::vector<t_vec> ker;
+
+	for(std::size_t vertidx=0; vertidx<vertsFwd.size(); ++vertidx)
+	{
+		std::size_t vertidx2 = (vertidx+1) % vertsFwd.size();
+
+		const t_vec& vert1 = vertsFwd[vertidx];
+		const t_vec& vert2 = vertsFwd[vertidx2];
+
+		if(is_edge_in_hull(vert1, vert2, hullFwd))
+		{
+			t_vec inters = get_inters(vert1, vert2);
+			ker.emplace_back(std::move(inters));
+		}
+	}
+
+	for(std::size_t vertidx=0; vertidx<vertsBwd.size(); ++vertidx)
+	{
+		std::size_t vertidx2 = (vertidx+1) % vertsBwd.size();
+
+		const t_vec& vert1 = vertsBwd[vertidx];
+		const t_vec& vert2 = vertsBwd[vertidx2];
+
+		if(is_edge_in_hull(vert1, vert2, hullBwd))
+		{
+			t_vec inters = get_inters(vert1, vert2);
+			ker.emplace_back(std::move(inters));
+		}
+	}
+
 	// TODO
 
+	std::tie(ker, std::ignore) = sort_vertices_by_angle<t_vec>(ker);
 	return ker;
 }
 

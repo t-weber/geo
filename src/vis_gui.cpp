@@ -240,7 +240,8 @@ void VisView::UpdateAll()
 	std::transform(m_elems_vertices.begin(), m_elems_vertices.end(), std::back_inserter(m_vertices),
 		[](const Vertex* vert) -> t_vec { return m::create<t_vec>({vert->x(), vert->y()}); } );
 
-	std::tie(m_vertices, std::ignore) = sort_vertices_by_angle<t_vec>(m_vertices);
+	if(m_sortvertices)
+		std::tie(m_vertices, std::ignore) = sort_vertices_by_angle<t_vec>(m_vertices);
 
 	UpdateEdges();
 	UpdateKer();
@@ -289,7 +290,7 @@ void VisView::UpdateKer()
 	m_elems_ker.clear();
 
 
-	auto kerpoly = calc_ker<t_vec>(m_vertices);
+	auto kerpoly = calc_ker<t_vec>(m_vertices, g_eps);
 
 
 	QPen penKer;
@@ -308,6 +309,13 @@ void VisView::UpdateKer()
 		QGraphicsItem *item = m_scene->addLine(line, penKer);
 		m_elems_ker.push_back(item);
 	}
+}
+
+
+void VisView::SetSortVertices(bool b)
+{
+	m_sortvertices = b;
+	UpdateAll();
 }
 
 
@@ -341,6 +349,9 @@ VisWnd::VisWnd(QWidget* pParent) : QMainWindow{pParent},
 		QByteArray arr{settings.value("wnd_state").toByteArray()};
 		this->restoreState(arr);
 	}
+
+	m_view->SetSortVertices(
+		settings.value("sort_vertices", m_view->GetSortVertices()).toBool());
 	// ------------------------------------------------------------------------
 
 
@@ -459,8 +470,16 @@ VisWnd::VisWnd(QWidget* pParent) : QMainWindow{pParent},
 		{ this->close(); });
 
 
+	QAction *actionSort = new QAction{"Sort Vertices", this};
+	actionSort->setCheckable(true);
+	actionSort->setChecked(m_view->GetSortVertices());
+	connect(actionSort, &QAction::toggled, [this](bool b)
+		{ m_view->SetSortVertices(b); });
+
+
 	// menu
 	QMenu *menuFile = new QMenu{"File", this};
+	QMenu *menuCalc = new QMenu{"Calculate", this};
 
 	menuFile->addAction(actionNew);
 	menuFile->addSeparator();
@@ -471,11 +490,14 @@ VisWnd::VisWnd(QWidget* pParent) : QMainWindow{pParent},
 	menuFile->addSeparator();
 	menuFile->addAction(actionQuit);
 
+	menuCalc->addAction(actionSort);
+
 
 	// menu bar
 	QMenuBar *menuBar = new QMenuBar{this};
 	menuBar->setNativeMenuBar(false);
 	menuBar->addMenu(menuFile);
+	menuBar->addMenu(menuCalc);
 	setMenuBar(menuBar);
 
 
@@ -505,6 +527,7 @@ void VisWnd::closeEvent(QCloseEvent *e)
 	QByteArray geo{this->saveGeometry()}, state{this->saveState()};
 	settings.setValue("wnd_geo", geo);
 	settings.setValue("wnd_state", state);
+	settings.setValue("sort_vertices", m_view->GetSortVertices());
 	// ------------------------------------------------------------------------
 
 	QMainWindow::closeEvent(e);

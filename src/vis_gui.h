@@ -60,6 +60,9 @@ public:
 	void UpdateEdges();
 	void UpdateKer();
 
+	void SetSortVertices(bool b);
+	bool GetSortVertices() const { return m_sortvertices; }
+
 protected:
 	virtual void mousePressEvent(QMouseEvent *evt) override;
 	virtual void mouseReleaseEvent(QMouseEvent *evt) override;
@@ -76,6 +79,8 @@ private:
 	bool m_dragging = false;
 
 	std::vector<t_vec> m_vertices{};
+
+	bool m_sortvertices = true;
 
 signals:
 	void SignalMouseCoordinates(double x, double y);
