@@ -273,7 +273,7 @@ requires m::is_vec<t_vec>
 
 
 template<class t_vec>
-std::tuple<bool, t_vec>
+std::pair<bool, t_vec>
 intersect_lines(const t_vec& pos1a, const t_vec& pos1b,
 	const t_vec& pos2a, const t_vec& pos2b)
 {
@@ -1433,6 +1433,115 @@ requires m::is_vec<t_vec>
 
 
 
+template<class t_vec, class t_real = typename t_vec::value_type>
+std::pair<bool, t_vec> get_inters_dual(const t_vec& vert1, const t_vec& vert2)
+requires m::is_vec<t_vec>
+{
+	t_real slope1 = -vert1[0];
+	t_real offs1 = vert1[1];
+	t_real slope2 = -vert2[0];
+	t_real offs2 = vert2[1];
+
+	// slope1*x + offs1 = slope2*x + offs2
+	// x = (offs2 - offs1) / (slope1 - slope2)
+	t_real intersX = (offs2-offs1) / (slope1-slope2);
+	t_real intersY = offs1 + slope1*intersX;
+
+	if(std::isfinite(intersX) && std::isfinite(intersY))
+		return std::make_pair(true, m::create<t_vec>({intersX, intersY}));
+	return std::make_pair(false, t_vec{});
+};
+
+
+
+/**
+ * lower halfplane intersection vertices
+ */
+template<class t_vec, class t_real = typename t_vec::value_type>
+std::vector<t_vec>
+halfplaneverts(const std::vector<t_vec>& verts, t_real eps)
+requires m::is_vec<t_vec>
+{
+	using namespace m_ops;
+	if(verts.size() < 3)
+		return std::vector<t_vec>({});
+
+
+	std::vector<t_vec> vertsDual;
+	for(std::size_t vertidx=0; vertidx<verts.size(); ++vertidx)
+	{
+		std::size_t vertidxNext = (vertidx+1) % verts.size();
+
+		const t_vec& vert1 = verts[vertidx];
+		const t_vec& vert2 = verts[vertidxNext];
+
+		if(t_vec dir=vert2-vert1; -dir[0] > 0.)
+		{
+			t_real slope = (vert2[1]-vert1[1]) / (vert2[0]-vert1[0]);
+			t_real offs = vert1[1] - vert1[0]*slope;
+
+			vertsDual.emplace_back(m::create<t_vec>({ -slope, offs }));
+		}
+	}
+
+
+	std::vector<t_vec> hullDual = calc_hull_iterative_bintree<t_vec>(vertsDual, eps);
+	std::tie(hullDual, std::ignore) = sort_vertices_by_angle<t_vec>(hullDual);
+
+
+	std::vector<t_vec> intersverts;
+
+	for(std::size_t hullidx=0; hullidx<hullDual.size(); ++hullidx)
+	{
+		std::size_t hullidx2 = (hullidx + 1) % hullDual.size();
+
+		const t_vec& vec1 = hullDual[hullidx];
+		const t_vec& vec2 = hullDual[hullidx2];
+
+		t_vec dir = vec2 - vec1;
+		//std::cout << "edge: " << vec1 << "\t" << vec2 << "\tdir: " << dir << std::endl;
+
+		if(-dir[0] < 0.)
+		{
+			if(auto [ok, inters] = get_inters_dual(vec1, vec2); ok)
+			{
+				//std::cout << "intersection: " << inters << std::endl;
+				intersverts.emplace_back(std::move(inters));
+			}
+		}
+	}
+	//std::cout << std::endl;
+
+	std::tie(intersverts, std::ignore) = sort_vertices_by_angle<t_vec>(intersverts);
+	return intersverts;
+}
+
+
+
+template<class t_vec, class t_real = typename t_vec::value_type>
+std::vector<t_vec>
+calc_ker_tst(const std::vector<t_vec>& verts, t_real eps)
+requires m::is_vec<t_vec>
+{
+	if(verts.size() < 3)
+		return std::vector<t_vec>({});
+
+	std::vector<t_vec> vertsneg;
+	for(const t_vec& vec : verts)
+		vertsneg.emplace_back(-vec);
+
+	auto verts1 = halfplaneverts(verts, eps);
+	auto verts2 = halfplaneverts(vertsneg, eps);
+
+	for(const t_vec& vec : verts2)
+		verts1.emplace_back(-vec);
+
+	std::tie(verts1, std::ignore) = sort_vertices_by_angle<t_vec>(verts1);
+ 	return verts1;
+}
+
+
+
 /**
  * kernel of a polygon
  */
@@ -1449,140 +1558,46 @@ requires m::is_vec<t_vec>
 	std::vector<t_edge> edgesFwd{{std::make_pair(0,1)}};
 	std::vector<t_edge> edgesBwd{{std::make_pair(verts.size()-1, verts.size()-2)}};
 
-	t_real last_angle = 0.;
-	for(std::size_t vertidx=1; vertidx<verts.size()-1; ++vertidx)
+	// TODO
+	for(std::size_t vertidx=1; vertidx<verts.size(); ++vertidx)
 	{
-		std::size_t vertidxPrev = (vertidx-1) % verts.size();
 		std::size_t vertidxNext = (vertidx+1) % verts.size();
-		const t_vec& vert0 = verts[vertidxPrev];
 		const t_vec& vert1 = verts[vertidx];
 		const t_vec& vert2 = verts[vertidxNext];
 
-		t_real angle = line_angle<t_vec>(vert0, vert1, vert1, vert2);
-		if(angle > last_angle)
+		const t_vec& lastvert1 = verts[edgesFwd.rbegin()->first];
+		const t_vec& lastvert2 = verts[edgesFwd.rbegin()->second];
+
+		t_real angle = line_angle<t_vec>(lastvert1, lastvert2, vert1, vert2);
+		if(angle > 0.)
 			edgesFwd.push_back(std::make_pair(vertidx, vertidxNext));
-		last_angle = angle;
 	}
 
-	last_angle = 0.;
 	for(std::size_t vertidx=verts.size()-2; vertidx>=1; --vertidx)
 	{
-		std::size_t vertidxPrev = (vertidx+1) % verts.size();
 		std::size_t vertidxNext = (vertidx-1) % verts.size();
-		const t_vec& vert0 = verts[vertidxPrev];
 		const t_vec& vert1 = verts[vertidx];
 		const t_vec& vert2 = verts[vertidxNext];
 
-		t_real angle = line_angle<t_vec>(vert0, vert1, vert1, vert2);
-		if(angle < last_angle)
+		const t_vec& lastvert1 = verts[edgesBwd.rbegin()->first];
+		const t_vec& lastvert2 = verts[edgesBwd.rbegin()->second];
+
+		t_real angle = line_angle<t_vec>(lastvert1, lastvert2, vert1, vert2);
+		if(angle < 0.)
 			edgesBwd.push_back(std::make_pair(vertidx, vertidxNext));
-		last_angle = angle;
 	}
 
 
-	std::vector<t_vec> vertsFwd;
-	for(const t_edge& edge : edgesFwd)
-	{
-		const t_vec& vert1 = verts[edge.first];
-		const t_vec& vert2 = verts[edge.second];
-
-		t_real slope = (vert2[1]-vert1[1]) / (vert2[0]-vert1[0]);
-		t_real offs = vert1[1] - vert1[0]*slope;
-
-		vertsFwd.emplace_back(m::create<t_vec>({ -slope, offs }));
-	}
-
-	std::vector<t_vec> vertsBwd;
-	for(const t_edge& edge : edgesBwd)
-	{
-		const t_vec& vert1 = verts[edge.first];
-		const t_vec& vert2 = verts[edge.second];
-
-		t_real slope = (vert2[1]-vert1[1]) / (vert2[0]-vert1[0]);
-		t_real offs = vert1[1] - vert1[0]*slope;
-
-		vertsBwd.emplace_back(m::create<t_vec>({ -slope, offs }));
-	}
-
-
-	std::vector<t_vec> hullFwd = calc_hull_iterative_bintree<t_vec>(vertsFwd, eps);
-	std::vector<t_vec> hullBwd = calc_hull_iterative_bintree<t_vec>(vertsBwd, eps);
-
-
-	auto is_edge_in_hull = [eps](const t_vec& vert1, const t_vec& vert2,
-		const std::vector<t_vec>& hull) -> bool
-	{
-		for(std::size_t i=0; i<hull.size(); ++i)
-		{
-			std::size_t j = (i+1) % hull.size();
-
-			const t_vec& hullvert1 = hull[i];
-			const t_vec& hullvert2 = hull[j];
-
-			if((m::equals<t_vec>(vert1, hullvert1, eps) && m::equals<t_vec>(vert2, hullvert2, eps)))
-			{
-				t_vec dir = vert2 - vert1;
-
-				// normal pointing downwards?
-				if(-dir[0] < t_real{0})
-					return true;
-			}
-		}
-		return false;
-	};
-
-	auto get_inters = [](const t_vec& vert1, const t_vec& vert2) -> t_vec
-	{
-		t_real slope1 = -vert1[0];
-		t_real offs1 = vert1[1];
-		t_real slope2 = -vert2[0];
-		t_real offs2 = vert2[1];
-
-		// slope1*x + offs1 = slope2*x + offs2
-		// x = (offs2 - offs1) / (slope1 - slope2)
-		t_real intersX = (offs2-offs1) / (slope1-slope2);
-		t_real intersY = offs1 + slope1*intersX;
-
-		return m::create<t_vec>({intersX, intersY});
-	};
+	// TODO
 
 
 	std::vector<t_vec> ker;
-
-	for(std::size_t vertidx=0; vertidx<vertsFwd.size(); ++vertidx)
-	{
-		std::size_t vertidx2 = (vertidx+1) % vertsFwd.size();
-
-		const t_vec& vert1 = vertsFwd[vertidx];
-		const t_vec& vert2 = vertsFwd[vertidx2];
-
-		if(is_edge_in_hull(vert1, vert2, hullFwd))
-		{
-			t_vec inters = get_inters(vert1, vert2);
-			ker.emplace_back(std::move(inters));
-		}
-	}
-
-	for(std::size_t vertidx=0; vertidx<vertsBwd.size(); ++vertidx)
-	{
-		std::size_t vertidx2 = (vertidx+1) % vertsBwd.size();
-
-		const t_vec& vert1 = vertsBwd[vertidx];
-		const t_vec& vert2 = vertsBwd[vertidx2];
-
-		if(is_edge_in_hull(vert1, vert2, hullBwd))
-		{
-			t_vec inters = get_inters(vert1, vert2);
-			ker.emplace_back(std::move(inters));
-		}
-	}
 
 	// TODO
 
 	std::tie(ker, std::ignore) = sort_vertices_by_angle<t_vec>(ker);
 	return ker;
 }
-
 
 
 // ----------------------------------------------------------------------------
