@@ -275,6 +275,13 @@ void HullView::SetDelaunayCalculationMethod(DelaunayCalculationMethod m)
 }
 
 
+void HullView::SetSpanCalculationMethod(SpanCalculationMethod m)
+{
+	m_spancalculationmethod = m;
+	UpdateDelaunay();
+}
+
+
 void HullView::ClearVertices()
 {
 	for(Vertex* vertex : m_vertices)
@@ -574,7 +581,20 @@ void HullView::UpdateDelaunay()
 		penKruskal.setColor(QColor::fromRgbF(0.,0.7,0.));
 
 		auto edges = get_edges(vertices, triags, g_eps);
-		auto span = calc_min_spantree<t_vec>(vertices, edges);
+		std::vector<std::pair<std::size_t, std::size_t>> span;
+
+		switch(m_spancalculationmethod)
+		{
+			case SpanCalculationMethod::KRUSKAL:
+				span = calc_min_spantree<t_vec>(vertices, edges);
+				break;
+			case SpanCalculationMethod::BOOST:
+				span = calc_min_spantree_boost<t_vec>(vertices);
+				break;
+			default:
+				QMessageBox::critical(this, "Error", "Unknown span tree calculation method.");
+				break;
+		}
 
 		for(const auto& spanedge : span)
 		{
@@ -817,6 +837,18 @@ HullWnd::HullWnd(QWidget* pParent) : QMainWindow{pParent},
 		{ m_view->SetDelaunayCalculationMethod(DelaunayCalculationMethod::PARABOLIC); });
 
 
+	QAction *actionSpanKruskal = new QAction{"Kruskal", this};
+	actionSpanKruskal->setCheckable(true);
+	actionSpanKruskal->setChecked(true);
+	connect(actionSpanKruskal, &QAction::toggled, [this]()
+	{ m_view->SetSpanCalculationMethod(SpanCalculationMethod::KRUSKAL); });
+
+	QAction *actionSpanBoost = new QAction{"Boost.Graph", this};
+	actionSpanBoost->setCheckable(true);
+	connect(actionSpanBoost, &QAction::toggled, [this]()
+		{ m_view->SetSpanCalculationMethod(SpanCalculationMethod::BOOST); });
+
+
 	QActionGroup *groupHullBack = new QActionGroup{this};
 	groupHullBack->addAction(actionHullQHull);
 	groupHullBack->addAction(actionHullContour);
@@ -828,11 +860,15 @@ HullWnd::HullWnd(QWidget* pParent) : QMainWindow{pParent},
 	groupDelaunayBack->addAction(actionDelaunayInc);
 	groupDelaunayBack->addAction(actionDelaunayPara);
 
+	QActionGroup *groupSpanBack = new QActionGroup{this};
+	groupSpanBack->addAction(actionSpanKruskal);
+	groupSpanBack->addAction(actionSpanBoost);
+
 
 	// menu
 	QMenu *menuFile = new QMenu{"File", this};
 	QMenu *menuCalc = new QMenu{"Calculate", this};
-	QMenu *menuBack = new QMenu{"Backend", this};
+	QMenu *menuBack = new QMenu{"Backends", this};
 
 	menuFile->addAction(actionNew);
 	menuFile->addSeparator();
@@ -851,15 +887,25 @@ HullWnd::HullWnd(QWidget* pParent) : QMainWindow{pParent},
 	menuCalc->addAction(actionDelaunay);
 	menuCalc->addAction(actionSpanTree);
 
-	menuBack->addSeparator()->setText("Convex Hull");
-	menuBack->addAction(actionHullQHull);
-	menuBack->addAction(actionHullContour);
-	menuBack->addAction(actionHullInc);
-	menuBack->addAction(actionHullDivide);
-	menuBack->addSeparator()->setText("Delaunay");
-	menuBack->addAction(actionDelaunayQHull);
-	menuBack->addAction(actionDelaunayInc);
-	menuBack->addAction(actionDelaunayPara);
+
+	QMenu *menuBackHull = new QMenu{"Convex Hull", this};
+	menuBackHull->addAction(actionHullQHull);
+	menuBackHull->addAction(actionHullContour);
+	menuBackHull->addAction(actionHullInc);
+	menuBackHull->addAction(actionHullDivide);
+
+	QMenu *menuDelaunay = new QMenu{"Delaunay Triangulation", this};
+	menuDelaunay->addAction(actionDelaunayQHull);
+	menuDelaunay->addAction(actionDelaunayInc);
+	menuDelaunay->addAction(actionDelaunayPara);
+
+	QMenu *menuSpan = new QMenu{"Minimum Spanning Tree", this};
+	menuSpan->addAction(actionSpanKruskal);
+	menuSpan->addAction(actionSpanBoost);
+
+	menuBack->addMenu(menuBackHull);
+	menuBack->addMenu(menuDelaunay);
+	menuBack->addMenu(menuSpan);
 
 
 	// menu bar

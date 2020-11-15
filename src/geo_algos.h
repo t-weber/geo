@@ -24,6 +24,8 @@
 #include "helpers.h"
 
 #include <boost/intrusive/bstree.hpp>
+#include <boost/graph/adjacency_list.hpp>
+#include <boost/graph/kruskal_min_spanning_tree.hpp>
 
 #include <libqhullcpp/Qhull.h>
 #include <libqhullcpp/QhullFacet.h>
@@ -1432,6 +1434,57 @@ requires m::is_vec<t_vec>
 
 
 
+template<class t_vec, class t_edge = std::pair<std::size_t, std::size_t>>
+std::vector<t_edge>
+calc_min_spantree_boost(const std::vector<t_vec>& verts)
+requires m::is_vec<t_vec>
+{
+	using t_real = typename t_vec::value_type;
+
+	struct t_edge_weight
+	{
+		t_edge_weight() = default;
+		t_edge_weight(t_real weight) : weight(weight) {}
+
+		t_real weight{1};
+	};
+
+	using t_graph = boost::adjacency_list<boost::vecS, boost::vecS, boost::undirectedS, t_vec, t_edge_weight>;
+	using t_edge_descr = typename boost::graph_traits<t_graph>::edge_descriptor;
+
+	t_graph graph;
+	auto weight = boost::get(&t_edge_weight::weight, graph);
+
+	for(const t_vec& vert : verts)
+		boost::add_vertex(vert, graph);
+
+	for(std::size_t i=0; i<verts.size(); ++i)
+	{
+		const t_vec& vert1 = verts[i];
+		for(std::size_t j=i+1; j<verts.size(); ++j)
+		{
+			const t_vec& vert2 = verts[j];
+			t_real dist = m::norm(vert2-vert1);
+			boost::add_edge(boost::vertex(i, graph), boost::vertex(j, graph), t_edge_weight{dist}, graph);
+		}
+	}
+
+	std::vector<t_edge_descr> spanning_edges;
+	boost::kruskal_minimum_spanning_tree(graph, std::back_inserter(spanning_edges), boost::weight_map(weight));
+
+	std::vector<t_edge> span;
+	for(auto iter=spanning_edges.begin(); iter!=spanning_edges.end(); ++iter)
+	{
+		std::size_t idx1 = boost::source(*iter, graph);
+		std::size_t idx2 = boost::target(*iter, graph);
+		span.emplace_back(std::make_pair(idx1, idx2));
+	}
+
+	return span;
+}
+
+
+
 // ----------------------------------------------------------------------------
 
 
@@ -1465,7 +1518,7 @@ std::vector<t_vec>
 halfplaneverts(const std::vector<t_vec>& verts, t_real eps)
 requires m::is_vec<t_vec>
 {
-	using namespace m_ops;
+	//using namespace m_ops;
 	if(verts.size() < 3)
 		return std::vector<t_vec>({});
 
@@ -1545,87 +1598,11 @@ requires m::is_vec<t_vec>
 
 
 
-/**
- * kernel of a polygon
- */
-template<class t_vec, class t_real = typename t_vec::value_type>
+template<class t_vec, class t_edge = std::pair<t_vec, t_vec>, class t_real = typename t_vec::value_type>
 std::vector<t_vec>
-calc_ker(const std::vector<t_vec>& verts, t_real eps)
+ker_from_edges(const std::vector<t_edge>& edges, t_real eps)
 requires m::is_vec<t_vec>
 {
-	if(verts.size() < 3)
-		return std::vector<t_vec>({});
-
-	using t_edge = std::pair<std::size_t, std::size_t>;
-
-	std::vector<t_edge> edgesFwd{{std::make_pair(0,1)}};
-	std::vector<t_edge> edgesBwd{{std::make_pair(verts.size()-1, verts.size()-2)}};
-
-	// TODO
-	for(std::size_t vertidx=1; vertidx<verts.size(); ++vertidx)
-	{
-		std::size_t vertidxNext = (vertidx+1) % verts.size();
-		const t_vec& vert1 = verts[vertidx];
-		const t_vec& vert2 = verts[vertidxNext];
-
-		const t_vec& lastvert1 = verts[edgesFwd.rbegin()->first];
-		const t_vec& lastvert2 = verts[edgesFwd.rbegin()->second];
-
-		t_real angle = line_angle<t_vec>(lastvert1, lastvert2, vert1, vert2);
-		if(angle > 0.)
-			edgesFwd.push_back(std::make_pair(vertidx, vertidxNext));
-	}
-
-	for(std::size_t vertidx=verts.size()-2; vertidx>=1; --vertidx)
-	{
-		std::size_t vertidxNext = (vertidx-1) % verts.size();
-		const t_vec& vert1 = verts[vertidx];
-		const t_vec& vert2 = verts[vertidxNext];
-
-		const t_vec& lastvert1 = verts[edgesBwd.rbegin()->first];
-		const t_vec& lastvert2 = verts[edgesBwd.rbegin()->second];
-
-		t_real angle = line_angle<t_vec>(lastvert1, lastvert2, vert1, vert2);
-		if(angle < 0.)
-			edgesBwd.push_back(std::make_pair(vertidx, vertidxNext));
-	}
-
-
-	// TODO
-
-
-	std::vector<t_vec> ker;
-
-	// TODO
-
-	std::tie(ker, std::ignore) = sort_vertices_by_angle<t_vec>(ker);
-	return ker;
-}
-
-
-
-/**
- * kernel of a polygon (inefficient O(n^2) test)
- * vertices have to be sorted in ccw order
- */
-template<class t_vec, class t_real = typename t_vec::value_type>
-std::vector<t_vec>
-calc_ker_ineff(const std::vector<t_vec>& verts, t_real eps)
-requires m::is_vec<t_vec>
-{
-	if(verts.size() < 3)
-		return std::vector<t_vec>({});
-
-	using t_edge = std::pair<t_vec, t_vec>;
-	std::vector<t_edge> edges;
-
-	for(std::size_t vertidx=0; vertidx<verts.size(); ++vertidx)
-	{
-		std::size_t vertidxNext = (vertidx+1) % verts.size();
-		edges.emplace_back(std::make_pair(verts[vertidx], verts[vertidxNext]));
-	}
-
-
 	std::vector<t_vec> intersections;
 
 	for(std::size_t i=0; i<edges.size(); ++i)
@@ -1665,6 +1642,97 @@ requires m::is_vec<t_vec>
 }
 
 
+
+/**
+ * kernel of a polygon (inefficient O(n^2) test)
+ * vertices have to be sorted in ccw order
+ */
+template<class t_vec, class t_real = typename t_vec::value_type>
+std::vector<t_vec>
+calc_ker_ineff(const std::vector<t_vec>& verts, t_real eps)
+requires m::is_vec<t_vec>
+{
+	if(verts.size() < 3)
+		return std::vector<t_vec>({});
+
+	using t_edge = std::pair<t_vec, t_vec>;
+	std::vector<t_edge> edges;
+
+	for(std::size_t vertidx=0; vertidx<verts.size(); ++vertidx)
+	{
+		std::size_t vertidxNext = (vertidx+1) % verts.size();
+		edges.emplace_back(std::make_pair(verts[vertidx], verts[vertidxNext]));
+	}
+
+	return ker_from_edges<t_vec, t_edge>(edges, eps);
+}
+
+
+
+/**
+ * kernel of a polygon
+ */
+template<class t_vec, class t_real = typename t_vec::value_type>
+std::vector<t_vec>
+calc_ker(const std::vector<t_vec>& verts, t_real eps)
+requires m::is_vec<t_vec>
+{
+	if(verts.size() < 3)
+		return std::vector<t_vec>({});
+
+	using t_edgeidx = std::pair<std::size_t, std::size_t>;
+	std::vector<t_edgeidx> edgesFwd{{std::make_pair(0,1)}};
+	std::vector<t_edgeidx> edgesBwd{{std::make_pair(verts.size()-1, verts.size()-2)}};
+
+	// TODO
+	for(std::size_t vertidx=1; vertidx<verts.size(); ++vertidx)
+	{
+		std::size_t vertidxNext = (vertidx+1) % verts.size();
+		const t_vec& vert1 = verts[vertidx];
+		const t_vec& vert2 = verts[vertidxNext];
+
+		const t_vec& lastvert1 = verts[edgesFwd.rbegin()->first];
+		const t_vec& lastvert2 = verts[edgesFwd.rbegin()->second];
+
+		t_real angle = line_angle<t_vec>(lastvert1, lastvert2, vert1, vert2);
+		if(angle > 0.)
+		{
+			edgesFwd.push_back(std::make_pair(vertidx, vertidxNext));
+			std::cout << "edge (fwd): " << vertidx << " " <<vertidxNext << std::endl;
+		}
+	}
+
+	for(std::ptrdiff_t vertidx=verts.size()-2; vertidx>=0; --vertidx)
+	{
+		std::ptrdiff_t vertidxNext = vertidx==0 ? verts.size()-1 : vertidx-1;
+		const t_vec& vert1 = verts[vertidx];
+		const t_vec& vert2 = verts[vertidxNext];
+
+		const t_vec& lastvert1 = verts[edgesBwd.rbegin()->first];
+		const t_vec& lastvert2 = verts[edgesBwd.rbegin()->second];
+
+		t_real angle = line_angle<t_vec>(lastvert1, lastvert2, vert1, vert2);
+		if(angle < 0.)
+		{
+			edgesBwd.push_back(std::make_pair(vertidx, vertidxNext));
+			std::cout << "edge (bwd): " << vertidx << " " <<vertidxNext << std::endl;
+		}
+	}
+
+
+	using t_edge = std::pair<t_vec, t_vec>;
+	std::vector<t_edge> edges;
+
+	for(const t_edgeidx& edge : edgesFwd)
+		edges.push_back(std::make_pair(verts[edge.first], verts[edge.second]));
+
+	for(const t_edgeidx& edge : edgesBwd)
+		edges.push_back(std::make_pair(verts[edge.first], verts[edge.second]));
+
+	return ker_from_edges<t_vec, t_edge>(edges, eps);
+}
+
 // ----------------------------------------------------------------------------
 
 #endif
+

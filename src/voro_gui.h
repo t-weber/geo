@@ -51,6 +51,14 @@ enum class DelaunayCalculationMethod
 };
 
 
+enum class SpanCalculationMethod
+{
+	KRUSKAL,
+	BOOST,
+};
+
+
+
 class HullView : public QGraphicsView
 {Q_OBJECT
 public:
@@ -74,6 +82,7 @@ public:
 
 	void SetHullCalculationMethod(HullCalculationMethod m);
 	void SetDelaunayCalculationMethod(DelaunayCalculationMethod m);
+	void SetSpanCalculationMethod(SpanCalculationMethod m);
 
 	void AddVertex(const QPointF& pos);
 	void ClearVertices();
@@ -108,6 +117,7 @@ private:
 
 	HullCalculationMethod m_hullcalculationmethod = HullCalculationMethod::QHULL;
 	DelaunayCalculationMethod m_delaunaycalculationmethod = DelaunayCalculationMethod::QHULL;
+	SpanCalculationMethod m_spancalculationmethod = SpanCalculationMethod::KRUSKAL;
 
 signals:
 	void SignalMouseCoordinates(double x, double y);

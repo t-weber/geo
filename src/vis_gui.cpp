@@ -291,6 +291,7 @@ void VisView::UpdateKer()
 
 
 	auto kerpoly = calc_ker_ineff<t_vec>(m_vertices, g_eps);
+	//auto kerpoly = calc_ker<t_vec>(m_vertices, g_eps);
 
 
 	QPen penKer;
