@@ -275,7 +275,7 @@ requires m::is_vec<t_vec>
 template<class t_vec>
 std::pair<bool, t_vec>
 intersect_lines(const t_vec& pos1a, const t_vec& pos1b,
-	const t_vec& pos2a, const t_vec& pos2b)
+	const t_vec& pos2a, const t_vec& pos2b, bool only_segments=true)
 {
 	t_vec dir1 = pos1b - pos1a;
 	t_vec dir2 = pos2b - pos2a;
@@ -283,7 +283,10 @@ intersect_lines(const t_vec& pos1a, const t_vec& pos1b,
 	auto[pt1, pt2, valid, dist, param1, param2] =
 		m::intersect_line_line(pos1a, dir1, pos2a, dir2);
 
-	if(!valid || param1<0. || param1>1. || param2<0. || param2>1.)
+	if(!valid)
+		return std::make_pair(false, m::create<t_vec>({}));
+
+	if(only_segments && (param1<0. || param1>1. || param2<0. || param2>1.))
 		return std::make_pair(false, m::create<t_vec>({}));
 
 	return std::make_pair(true, pt1);
@@ -1594,6 +1597,68 @@ requires m::is_vec<t_vec>
 	std::vector<t_vec> ker;
 
 	// TODO
+
+	std::tie(ker, std::ignore) = sort_vertices_by_angle<t_vec>(ker);
+	return ker;
+}
+
+
+
+/**
+ * kernel of a polygon (inefficient O(n^2) test)
+ * vertices have to be sorted in ccw order
+ */
+template<class t_vec, class t_real = typename t_vec::value_type>
+std::vector<t_vec>
+calc_ker_ineff(const std::vector<t_vec>& verts, t_real eps)
+requires m::is_vec<t_vec>
+{
+	if(verts.size() < 3)
+		return std::vector<t_vec>({});
+
+	using t_edge = std::pair<t_vec, t_vec>;
+	std::vector<t_edge> edges;
+
+	for(std::size_t vertidx=0; vertidx<verts.size(); ++vertidx)
+	{
+		std::size_t vertidxNext = (vertidx+1) % verts.size();
+		edges.emplace_back(std::make_pair(verts[vertidx], verts[vertidxNext]));
+	}
+
+
+	std::vector<t_vec> intersections;
+
+	for(std::size_t i=0; i<edges.size(); ++i)
+	{
+		for(std::size_t j=i+1; j<edges.size(); ++j)
+		{
+			if(auto [ok, inters] = intersect_lines<t_vec>(
+				edges[i].first, edges[i].second,
+				edges[j].first, edges[j].second, false); ok)
+			{
+				intersections.emplace_back(std::move(inters));
+			}
+		}
+	}
+
+
+	std::vector<t_vec> ker;
+
+	for(const t_vec& inters : intersections)
+	{
+		bool in_ker = true;
+		for(const t_edge& edge : edges)
+		{
+			if(side_of_line<t_vec>(edge.first, edge.second, inters) < -eps)
+			{
+				in_ker = false;
+				break;
+			}
+		}
+
+		if(in_ker)
+			ker.push_back(inters);
+	}
 
 	std::tie(ker, std::ignore) = sort_vertices_by_angle<t_vec>(ker);
 	return ker;

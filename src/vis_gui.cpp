@@ -290,25 +290,34 @@ void VisView::UpdateKer()
 	m_elems_ker.clear();
 
 
-	auto kerpoly = calc_ker<t_vec>(m_vertices, g_eps);
+	auto kerpoly = calc_ker_ineff<t_vec>(m_vertices, g_eps);
 
 
 	QPen penKer;
 	penKer.setStyle(Qt::SolidLine);
 	penKer.setWidthF(2.);
-	penKer.setColor(QColor::fromRgbF(1., 0., 0.));
+	penKer.setColor(QColor::fromRgbF(1., 0., 0., 1.));
 
+	QBrush brushKer;
+	brushKer.setColor(QColor::fromRgbF(1., 0., 0., 0.1));
+	brushKer.setStyle(Qt::SolidPattern);
+
+	QPolygonF poly;
 	for(std::size_t vertidx = 0; vertidx < kerpoly.size(); ++vertidx)
 	{
-		std::size_t vertidx2 = (vertidx+1) % kerpoly.size();
-
+		//std::size_t vertidx2 = (vertidx+1) % kerpoly.size();
 		const t_vec& vertex1 = kerpoly[vertidx];
-		const t_vec& vertex2 = kerpoly[vertidx2];
+		//const t_vec& vertex2 = kerpoly[vertidx2];
 
-		QLineF line{QPointF{vertex1[0], vertex1[1]}, QPointF{vertex2[0], vertex2[1]}};
-		QGraphicsItem *item = m_scene->addLine(line, penKer);
-		m_elems_ker.push_back(item);
+		//QLineF line{QPointF{vertex1[0], vertex1[1]}, QPointF{vertex2[0], vertex2[1]}};
+		//QGraphicsItem *item = m_scene->addLine(line, penKer);
+		//m_elems_ker.push_back(item);
+
+		poly << QPointF(vertex1[0], vertex1[1]);
 	}
+
+	QGraphicsItem *item = m_scene->addPolygon(poly, penKer, brushKer);
+	m_elems_ker.push_back(item);
 }
 
 
