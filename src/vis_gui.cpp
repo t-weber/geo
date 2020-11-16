@@ -290,8 +290,18 @@ void VisView::UpdateKer()
 	m_elems_ker.clear();
 
 
-	auto kerpoly = calc_ker_ineff<t_vec>(m_vertices, g_eps);
+	std::vector<t_vec> verts_reversed;
+	verts_reversed.reserve(m_vertices.size());
+	for(auto iter=m_vertices.rbegin(); iter!=m_vertices.rend(); ++iter)
+		verts_reversed.push_back(*iter);
+
 	//auto kerpoly = calc_ker<t_vec>(m_vertices, g_eps);
+	auto kerpoly = calc_ker_ineff<t_vec>(m_vertices, g_eps);
+	auto kerpoly_reversed = calc_ker_ineff<t_vec>(verts_reversed, g_eps);
+
+	// in case the vertices were inserted in reversed order
+	if(kerpoly_reversed.size() > kerpoly.size())
+		kerpoly = kerpoly_reversed;
 
 
 	QPen penKer;
