@@ -1894,7 +1894,7 @@ requires m::is_vec<t_vec>
 		events.pop();
 
 		curX = evt.x;
-		std::cout << "Event: "; evt.print(std::cout); std::cout << std::endl;
+		//std::cout << "Event: "; evt.print(std::cout); std::cout << std::endl;
 
 		switch(evt.ty)
 		{
@@ -1990,7 +1990,13 @@ requires m::is_vec<t_vec>
 						{ return m::equals<t_vec>(std::get<2>(inters), *evt.intersection, eps); })
 					== intersections.end())
 				{
+					// report an intersection
 					intersections.emplace_back(std::make_tuple(*evt.lower_idx, *evt.upper_idx, *evt.intersection));
+				}
+				else
+				{
+					// intersection already reported
+					continue;
 				}
 
 				// find upper line
@@ -2060,4 +2066,3 @@ requires m::is_vec<t_vec>
 
 
 #endif
-

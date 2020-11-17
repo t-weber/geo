@@ -56,8 +56,8 @@ void Widget::resizeEvent(QResizeEvent *pEvt)
 	m_screenDims[0] = pEvt->size().width();
 	m_screenDims[1] = pEvt->size().height();
 
-	std::cerr << std::dec << __func__ << ": w = " << m_screenDims[0]
-		<< ", h = " << m_screenDims[1] << std::endl;
+	//std::cerr << std::dec << __func__ << ": w = " << m_screenDims[0]
+	//	<< ", h = " << m_screenDims[1] << std::endl;
 }
 
 
@@ -314,7 +314,7 @@ int main(int argc, char** argv)
 	set_locales();
 
 	auto dlg = std::make_unique<TstDlg>(nullptr);
-	dlg->resize(800, 800);
+	dlg->resize(800, 700);
 	dlg->show();
 
 	return app->exec();

@@ -180,9 +180,21 @@ void LinesView::mousePressEvent(QMouseEvent *evt)
 		{
 			m_scene->removeItem(item);
 			auto iter = std::find(m_elems_vertices.begin(), m_elems_vertices.end(), static_cast<Vertex*>(item));
+
+			std::size_t idx = iter - m_elems_vertices.begin();
 			if(iter != m_elems_vertices.end())
 				iter = m_elems_vertices.erase(iter);
 			delete item;
+
+			// move remaining vertex of line to the end
+			std::size_t otheridx = (idx % 2 == 0 ? idx : idx-1);
+			if(otheridx < m_elems_vertices.size())
+			{
+				Vertex* vert = m_elems_vertices[otheridx];
+				m_elems_vertices.erase(m_elems_vertices.begin()+otheridx);
+				m_elems_vertices.push_back(vert);
+			}
+
 			UpdateAll();
 		}
 	}
@@ -231,6 +243,13 @@ void LinesView::ClearVertices()
 }
 
 
+void LinesView::SetIntersectionCalculationMethod(IntersectionCalculationMethod m)
+{
+	m_intersectioncalculationmethod = m;
+	UpdateIntersections();
+}
+
+
 void LinesView::UpdateAll()
 {
 	UpdateLines();
@@ -262,6 +281,10 @@ void LinesView::UpdateLines()
 
 		t_vec vert1 = m::create<t_vec>({_vert1->x(), _vert1->y()});
 		t_vec vert2 = m::create<t_vec>({_vert2->x(), _vert2->y()});
+
+		// ensure that first vertex is on the left-hand side
+		if(vert1[0] > vert2[0])
+			std::swap(vert1, vert2);
 
 		m_lines.emplace_back(std::make_pair(vert1, vert2));
 	}
@@ -296,8 +319,20 @@ void LinesView::UpdateIntersections()
 	m_elems_inters.clear();
 
 
-	auto intersections = intersect_ineff<t_vec, std::pair<t_vec, t_vec>>(m_lines);
-	//auto intersections = intersect_sweep<t_vec, std::pair<t_vec, t_vec>>(m_lines, g_eps);
+	std::vector<std::tuple<std::size_t, std::size_t, t_vec>> intersections;
+
+	switch(m_intersectioncalculationmethod)
+	{
+		case IntersectionCalculationMethod::DIRECT:
+			intersections = intersect_ineff<t_vec, std::pair<t_vec, t_vec>>(m_lines);
+			break;
+		case IntersectionCalculationMethod::SWEEP:
+			intersections = intersect_sweep<t_vec, std::pair<t_vec, t_vec>>(m_lines, g_eps);
+			break;
+		default:
+			QMessageBox::critical(this, "Error", "Unknown intersection calculation method.");
+			break;
+	};
 
 
 	QPen pen;
@@ -313,7 +348,7 @@ void LinesView::UpdateIntersections()
 	{
 		const t_vec& inters = std::get<2>(intersection);
 
-		const t_real width = 16.;
+		const t_real width = 14.;
 		QRectF rect{inters[0]-width/2, inters[1]-width/2, width, width};
 		QGraphicsItem *item = m_scene->addEllipse(rect, pen, brush);
 		m_elems_inters.push_back(item);
@@ -468,8 +503,27 @@ LinesWnd::LinesWnd(QWidget* pParent) : QMainWindow{pParent},
 		{ this->close(); });
 
 
+	QAction *actionIntersDirect = new QAction{"Direct", this};
+	actionIntersDirect->setCheckable(true);
+	actionIntersDirect->setChecked(false);
+	connect(actionIntersDirect, &QAction::toggled, [this]()
+	{ m_view->SetIntersectionCalculationMethod(IntersectionCalculationMethod::DIRECT); });
+
+	QAction *actionIntersSweep = new QAction{"Sweep", this};
+	actionIntersSweep->setCheckable(true);
+	actionIntersSweep->setChecked(true);
+	connect(actionIntersSweep, &QAction::toggled, [this]()
+	{ m_view->SetIntersectionCalculationMethod(IntersectionCalculationMethod::SWEEP); });
+
+
+	QActionGroup *groupInters = new QActionGroup{this};
+	groupInters->addAction(actionIntersDirect);
+	groupInters->addAction(actionIntersSweep);
+
+
 	// menu
 	QMenu *menuFile = new QMenu{"File", this};
+	QMenu *menuBack = new QMenu{"Backend", this};
 
 	menuFile->addAction(actionNew);
 	menuFile->addSeparator();
@@ -480,11 +534,15 @@ LinesWnd::LinesWnd(QWidget* pParent) : QMainWindow{pParent},
 	menuFile->addSeparator();
 	menuFile->addAction(actionQuit);
 
+	menuBack->addAction(actionIntersDirect);
+	menuBack->addAction(actionIntersSweep);
+
 
 	// menu bar
 	QMenuBar *menuBar = new QMenuBar{this};
 	menuBar->setNativeMenuBar(false);
 	menuBar->addMenu(menuFile);
+	menuBar->addMenu(menuBack);
 	setMenuBar(menuBar);
 
 

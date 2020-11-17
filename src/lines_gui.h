@@ -36,6 +36,13 @@ private:
 };
 
 
+enum class IntersectionCalculationMethod
+{
+	DIRECT,
+	SWEEP,
+};
+
+
 class LinesView : public QGraphicsView
 {Q_OBJECT
 public:
@@ -60,6 +67,8 @@ public:
 	void UpdateLines();
 	void UpdateIntersections();
 
+	void SetIntersectionCalculationMethod(IntersectionCalculationMethod m);
+
 protected:
 	virtual void mousePressEvent(QMouseEvent *evt) override;
 	virtual void mouseReleaseEvent(QMouseEvent *evt) override;
@@ -76,6 +85,8 @@ private:
 	bool m_dragging = false;
 
 	std::vector<std::pair<t_vec, t_vec>> m_lines{};
+
+	IntersectionCalculationMethod m_intersectioncalculationmethod = IntersectionCalculationMethod::SWEEP;
 
 signals:
 	void SignalMouseCoordinates(double x, double y);
