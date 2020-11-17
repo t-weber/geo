@@ -5,25 +5,29 @@
  * @license: see 'LICENSE' file
  *
  * References:
- *	- http://dx.doi.org/10.1007/3-540-27619-X, esp. ch 4.1, ch. 6
+ *	- http://dx.doi.org/10.1007/3-540-27619-X
  */
 
 #ifndef __GEO2D_H__
 #define __GEO2D_H__
 
 #include <vector>
+#include <queue>
 #include <list>
 #include <set>
 #include <tuple>
 #include <stack>
 #include <algorithm>
 #include <limits>
+#include <iostream>
 
 #include "math_algos.h"
 #include "math_conts.h"
 #include "helpers.h"
 
 #include <boost/intrusive/bstree.hpp>
+#include <boost/intrusive/avltree.hpp>
+
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/kruskal_min_spanning_tree.hpp>
 
@@ -35,8 +39,6 @@
 #include <libqhullcpp/QhullVertexSet.h>
 
 
-// ----------------------------------------------------------------------------
-// Helper functions
 // ----------------------------------------------------------------------------
 
 template<class t_vec>
@@ -278,6 +280,7 @@ template<class t_vec>
 std::pair<bool, t_vec>
 intersect_lines(const t_vec& pos1a, const t_vec& pos1b,
 	const t_vec& pos2a, const t_vec& pos2b, bool only_segments=true)
+requires m::is_vec<t_vec>
 {
 	t_vec dir1 = pos1b - pos1a;
 	t_vec dir2 = pos2b - pos2a;
@@ -292,6 +295,16 @@ intersect_lines(const t_vec& pos1a, const t_vec& pos1b,
 		return std::make_pair(false, m::create<t_vec>({}));
 
 	return std::make_pair(true, pt1);
+}
+
+
+template<class t_line /*= std::pair<t_vec, t_vec>*/>
+std::tuple<bool, typename t_line::first_type>
+intersect_lines(const t_line& line1, const t_line& line2)
+requires m::is_vec<typename t_line::first_type> && m::is_vec<typename t_line::second_type>
+{
+	return intersect_lines<typename t_line::first_type>(
+		line1.first, line1.second, line2.first, line2.second, true);
 }
 
 
@@ -1732,7 +1745,319 @@ requires m::is_vec<t_vec>
 	return ker_from_edges<t_vec, t_edge>(edges, eps);
 }
 
+
+
 // ----------------------------------------------------------------------------
+
+
+template<class t_vec, class t_line = std::pair<t_vec, t_vec>>
+std::vector<std::tuple<std::size_t, std::size_t, t_vec>>
+intersect_ineff(const std::vector<t_line>& lines)
+requires m::is_vec<t_vec>
+{
+	std::vector<std::tuple<std::size_t, std::size_t, t_vec>> intersections;
+
+	for(std::size_t i=0; i<lines.size(); ++i)
+	{
+		for(std::size_t j=i+1; j<lines.size(); ++j)
+		{
+			const t_line& line1 = lines[i];
+			const t_line& line2 = lines[j];
+
+			if(auto [intersects, pt] = intersect_lines<t_line>(line1, line2); intersects)
+				intersections.emplace_back(std::make_tuple(i, j, pt));
+		}
+	}
+
+	return intersections;
+}
+
+
+template<class t_hook, class t_vec, class t_line = std::pair<t_vec, t_vec>>
+requires m::is_vec<t_vec>
+struct TreeLeaf
+{
+	using t_real = typename t_vec::value_type;
+
+	const t_real *curX{nullptr};
+	const std::vector<t_line> *lines{nullptr};
+	std::size_t line_idx{0};
+
+	t_hook _h{};
+
+	friend std::ostream& operator<<(std::ostream& ostr, const TreeLeaf<t_hook, t_vec, t_line>& e)
+	{
+		ostr << std::get<0>((*e.lines)[e.line_idx]) << ", " << std::get<1>((*e.lines)[e.line_idx]);
+		return ostr;
+	}
+
+	friend bool operator<(const TreeLeaf<t_hook, t_vec, t_line>& e1, const TreeLeaf<t_hook, t_vec, t_line>& e2)
+	{
+		auto get_line_y = [](const t_line& line, t_real x) -> t_real
+		{
+			const t_vec& pt1 = std::get<0>(line);
+			const t_vec& pt2 = std::get<1>(line);
+
+			t_real slope = (pt2[1]-pt1[1]) / (pt2[0]-pt1[0]);
+			return pt1[1] + (x-pt1[0])*slope;
+		};
+
+		t_real line1_y = get_line_y((*e1.lines)[e1.line_idx], *e1.curX);
+		t_real line2_y = get_line_y((*e2.lines)[e2.line_idx], *e2.curX);
+
+		// compare by y
+		return line1_y < line2_y;
+	}
+};
+
+
+template<class t_vec, class t_line = std::pair<t_vec, t_vec>, class t_real = typename t_vec::value_type>
+std::vector<std::tuple<std::size_t, std::size_t, t_vec>>
+intersect_sweep(const std::vector<t_line>& lines, t_real eps = 1e-6)
+requires m::is_vec<t_vec>
+{
+	enum class SweepEventType { LEFT_VERTEX, RIGHT_VERTEX, INTERSECTION };
+
+	struct SweepEvent
+	{
+		t_real x;
+		SweepEventType ty{SweepEventType::LEFT_VERTEX};
+
+		std::size_t line_idx{};
+		std::optional<std::size_t> lower_idx{}, upper_idx{};
+		std::optional<t_vec> intersection{};
+
+		void print(std::ostream& ostr)
+		{
+			using namespace m_ops;
+
+			std::string strty;
+			if(ty == SweepEventType::LEFT_VERTEX)
+				strty = "left_vertex";
+			else if(ty == SweepEventType::RIGHT_VERTEX)
+				strty = "right_vertex";
+			else if(ty == SweepEventType::INTERSECTION)
+				strty = "intersection";
+
+			ostr << "x=" << std::setw(6) << x << ", type=" << std::setw(12)
+				<< strty << ", line " << line_idx;
+			if(lower_idx)
+				ostr << ", lower=" << *lower_idx;
+			if(upper_idx)
+				ostr << ", upper=" << *upper_idx;
+
+			if(intersection)
+				ostr << ", intersection=" << *intersection;
+		}
+	};
+
+
+	namespace intr = boost::intrusive;
+
+	using t_leaf = TreeLeaf<
+	intr::avl_set_member_hook<
+	intr::link_mode<
+	intr::normal_link>>, t_vec, t_line>;
+
+	using t_tree = intr::avltree<
+	t_leaf, intr::member_hook<
+	t_leaf, decltype(t_leaf::_h), &t_leaf::_h>>;
+
+
+	// events
+	auto events_comp = [](const SweepEvent& evt1, const SweepEvent& evt2) -> bool { return evt1.x > evt2.x; };
+
+	std::priority_queue<SweepEvent, std::vector<SweepEvent>, decltype(events_comp)> events(events_comp);
+
+	for(std::size_t line_idx=0; line_idx<lines.size(); ++line_idx)
+	{
+		const t_line& line = lines[line_idx];
+
+		SweepEvent evtLeft{.x = std::get<0>(line)[0], .ty=SweepEventType::LEFT_VERTEX, .line_idx=line_idx};
+		events.emplace(std::move(evtLeft));
+
+		SweepEvent evtRight{.x = std::get<1>(line)[0], .ty=SweepEventType::RIGHT_VERTEX, .line_idx=line_idx};
+		events.emplace(std::move(evtRight));
+	}
+
+
+	// status
+	t_tree status;
+
+	// results
+	std::vector<std::tuple<std::size_t, std::size_t, t_vec>> intersections;
+
+	t_real curX = 0.;
+	while(events.size())
+	{
+		SweepEvent evt{std::move(events.top())};
+		events.pop();
+
+		curX = evt.x;
+		std::cout << "Event: "; evt.print(std::cout); std::cout << std::endl;
+
+		switch(evt.ty)
+		{
+			case SweepEventType::LEFT_VERTEX:
+			{
+				// activate line
+				t_leaf *leaf = new t_leaf{.curX=&curX, .lines=&lines, .line_idx=evt.line_idx};
+				auto iter = status.insert_equal(*leaf);
+
+				auto iterPrev = (iter == status.begin() ? status.end() : std::prev(iter, 1));
+				auto iterNext = std::next(iter, 1);
+
+				// add possible intersection event
+				if(iterPrev != iter && iterPrev != status.end())
+				{
+					//std::cout << "index: " << evt.line_idx << ", prev: " << iterPrev->line_idx << std::endl;
+
+					const t_line& line = lines[evt.line_idx];
+					const t_line& linePrev = lines[iterPrev->line_idx];
+
+					if(auto [intersects, pt] = intersect_lines<t_line>(line, linePrev);
+					   intersects && !m::equals<t_real>(curX, pt[0], eps))
+					{
+						SweepEvent evtPrev{.x = pt[0], .ty=SweepEventType::INTERSECTION,
+							.lower_idx=iterPrev->line_idx, .upper_idx=evt.line_idx,
+							.intersection=pt};
+						events.emplace(std::move(evtPrev));
+					}
+				}
+
+				// add possible intersection event
+				if(iterNext != iter && iterNext != status.end())
+				{
+					//std::cout << "index: " << evt.line_idx << ", next: " << iterNext->line_idx << std::endl;
+
+					const t_line& line = lines[evt.line_idx];
+					const t_line& lineNext = lines[iterNext->line_idx];
+
+					if(auto [intersects, pt] = intersect_lines<t_line>(line, lineNext);
+					   intersects && !m::equals<t_real>(curX, pt[0], eps))
+					{
+						SweepEvent evtNext{.x = pt[0], .ty=SweepEventType::INTERSECTION,
+							.lower_idx=evt.line_idx, .upper_idx=iterNext->line_idx,
+							.intersection=pt};
+						events.emplace(std::move(evtNext));
+					}
+				}
+
+				break;
+			}
+			case SweepEventType::RIGHT_VERTEX:
+			{
+				// find current line
+				auto iter = std::find_if(status.begin(), status.end(),
+					[&evt](const auto& leaf) -> bool
+					{ return leaf.line_idx == evt.line_idx; });
+
+				if(iter == status.end())
+					continue;
+
+				auto iterPrev = (iter == status.begin() ? status.end() : std::prev(iter, 1));
+				auto iterNext = std::next(iter, 1);
+
+				// inactivate current line
+				delete &*iter;
+				iter = status.erase(iter);
+
+
+				// add possible intersection event
+				if(iterPrev != iterNext && iterPrev != status.end() && iterNext != status.end())
+				{
+					//std::cout << "prev: " << iterPrev->line_idx << ", next: " << iterNext->line_idx << std::endl;
+
+					const t_line& linePrev = lines[iterPrev->line_idx];
+					const t_line& lineNext = lines[iterNext->line_idx];
+
+					if(auto [intersects, pt] = intersect_lines<t_line>(linePrev, lineNext);
+					   intersects && !m::equals<t_real>(curX, pt[0], eps))
+					{
+						SweepEvent evt{.x = pt[0], .ty=SweepEventType::INTERSECTION,
+							.lower_idx=iterPrev->line_idx, .upper_idx=iterNext->line_idx,
+							.intersection=pt};
+						events.emplace(std::move(evt));
+					}
+				}
+
+				break;
+			}
+			case SweepEventType::INTERSECTION:
+			{
+				if(std::find_if(intersections.begin(), intersections.end(),
+					[&evt, eps](const auto& inters) -> bool
+						{ return m::equals<t_vec>(std::get<2>(inters), *evt.intersection, eps); })
+					== intersections.end())
+				{
+					intersections.emplace_back(std::make_tuple(*evt.lower_idx, *evt.upper_idx, *evt.intersection));
+				}
+
+				// find upper line
+				auto iterUpper = std::find_if(status.begin(), status.end(),
+					[&evt](const auto& leaf) -> bool
+					{ return leaf.line_idx == evt.upper_idx; });
+
+				// find lower line
+				auto iterLower = std::find_if(status.begin(), status.end(),
+					[&evt](const auto& leaf) -> bool
+					{ return leaf.line_idx == evt.lower_idx; });
+
+
+				std::swap(iterUpper->line_idx, iterLower->line_idx);
+				std::swap(iterUpper, iterLower);
+
+
+				auto iterPrev = (iterUpper == status.begin() ? status.end() : std::prev(iterUpper, 1));
+				auto iterNext = std::next(iterLower, 1);
+
+
+				// add possible intersection event
+				if(iterPrev != iterUpper && iterPrev != status.end() && iterUpper != status.end())
+				{
+					//std::cout << "prev: " << iterPrev->line_idx << ", upper: " << iterUpper->line_idx << std::endl;
+
+					const t_line& linePrev = lines[iterPrev->line_idx];
+					const t_line& lineUpper = lines[iterUpper->line_idx];
+
+					if(auto [intersects, pt] = intersect_lines<t_line>(linePrev, lineUpper);
+					   intersects && !m::equals<t_real>(curX, pt[0], eps))
+					{
+						SweepEvent evtPrev{.x = pt[0], .ty=SweepEventType::INTERSECTION,
+							.lower_idx=iterPrev->line_idx, .upper_idx=iterUpper->line_idx,
+							.intersection=pt};
+						events.emplace(std::move(evtPrev));
+					}
+				}
+
+				// add possible intersection event
+				if(iterNext != iterLower && iterNext != status.end() && iterLower != status.end())
+				{
+					//std::cout << "next: " << iterNext->line_idx << ", lower: " << iterLower->line_idx << std::endl;
+
+					const t_line& lineNext = lines[iterNext->line_idx];
+					const t_line& lineLower = lines[iterLower->line_idx];
+
+					if(auto [intersects, pt] = intersect_lines<t_line>(lineNext, lineLower);
+					   intersects && !m::equals<t_real>(curX, pt[0], eps))
+					{
+						SweepEvent evtNext{.x = pt[0], .ty=SweepEventType::INTERSECTION,
+							.lower_idx=iterLower->line_idx, .upper_idx=iterNext->line_idx,
+							.intersection=pt};
+						events.emplace(std::move(evtNext));
+					}
+				}
+
+				break;
+			}
+		}
+	}
+
+	return intersections;
+}
+
+// ----------------------------------------------------------------------------
+
 
 #endif
 
