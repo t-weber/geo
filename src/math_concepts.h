@@ -11,6 +11,7 @@
 #include <cstddef>
 #include <iterator>
 #include <complex>
+#include <concepts>
 
 
 namespace m {
@@ -22,7 +23,7 @@ namespace m {
  * requirements for a scalar type
  */
 template<class T>
-concept /*bool*/ is_scalar = 
+concept /*bool*/ is_scalar =
 	std::is_floating_point_v<T> || std::is_integral_v<T> /*|| std::is_arithmetic_v<T>*/;
 
 
@@ -115,6 +116,20 @@ concept /*bool*/ is_complex = requires(const T& a)
 	a-a;
 	a*a;
 	a/a;
+};
+
+
+/**
+ * requirements for an iterable container
+ */
+template<class T>
+concept /*bool*/ is_iterable = requires(const T& a)
+{
+	a.begin();
+	a.end();
+
+	{ a.begin() == a.end() } -> std::same_as<bool>;
+	{ a.begin() != a.end() } -> std::same_as<bool>;
 };
 // ----------------------------------------------------------------------------
 

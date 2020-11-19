@@ -10,92 +10,12 @@
 #include <iostream>
 #include <iomanip>
 #include <array>
-#include <algorithm>
-#include <random>
 #include <type_traits>
 #include <cstdint>
 
+#include "../src/geo_algos.h"
 
 //#define DO_TEST
-
-
-template<class t_num>
-t_num get_rand()
-{
-	static std::mt19937 rng{std::random_device{}()};
-
-	t_num min = -std::numeric_limits<t_num>::max();
-	t_num max = std::numeric_limits<t_num>::max();
-
-	if constexpr(std::is_integral_v<t_num>)
-		return std::uniform_int_distribution<t_num>(min, max)(rng);
-	else
-		return std::uniform_real_distribution<t_num>(min, max)(rng);
-}
-
-
-
-template<class t_largernum, class t_arr>
-std::tuple<std::size_t, std::size_t, t_largernum>
-subvec_ineffic(const t_arr& arr)
-{
-	std::size_t start_idx = 0;
-	std::size_t end_idx = 0;
-	t_largernum val = -std::numeric_limits<t_largernum>::max();
-
-	for(std::size_t start=0; start<arr.size(); ++start)
-	{
-		for(std::size_t end=start+1; end<=arr.size(); ++end)
-		{
-			t_largernum sum = std::accumulate(arr.begin()+start, arr.begin()+end, t_largernum{0});
-			if(sum > val)
-			{
-				val = sum;
-				start_idx = start;
-				end_idx = end;
-			}
-		}
-	}
-
-	return std::make_tuple(start_idx, end_idx, val);
-}
-
-
-
-template<class t_largernum, class t_arr>
-std::tuple<std::size_t, std::size_t, t_largernum>
-subvec_sweep(const t_arr& arr)
-{
-	std::size_t cached_start_idx = 0;
-	std::size_t start_idx = 0;
-	std::size_t end_idx = 0;
-
-	t_largernum newval = 0;
-	t_largernum val = 0;
-
-	for(std::size_t idx=0; idx<arr.size(); ++idx)
-	{
-		if(newval < -arr[idx])
-		{
-			newval = t_largernum{0};
-			cached_start_idx = idx+1;
-		}
-		else
-		{
-			newval += arr[idx];
-		}
-
-		if(newval > val)
-		{
-			val = newval;
-			start_idx = cached_start_idx;
-			end_idx = idx+1;
-		}
-	}
-
-	return std::make_tuple(start_idx, end_idx, val);
-}
-
 
 
 #ifdef DO_TEST
@@ -136,7 +56,9 @@ int main()
 	return 0;
 }
 
+
 #else
+
 
 int main()
 {
