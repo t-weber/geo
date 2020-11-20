@@ -27,14 +27,14 @@ add_compile_options(-Wall -Wextra -Weffc++)
 add_definitions(${Boost_CXX_FLAGS})
 
 include_directories(
-	${PROJECT_SOURCE_DIR}
+	${PROJECT_SOURCE_DIR} ${PROJECT_SOURCE_DIR}/src
 	${Boost_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS}/..
 	${Qt5Svg_INCLUDE_DIRS}
 )
 
 
 add_executable(voro
-	src/voro_gui.cpp src/voro_gui.h
+	src/gui/voro_gui.cpp src/gui/voro_gui.h
 	src/geo_algos.h src/math_algos.h
 )
 
@@ -45,7 +45,7 @@ target_link_libraries(voro
 
 
 add_executable(vis
-	src/vis_gui.cpp src/vis_gui.h
+	src/gui/vis_gui.cpp src/gui/vis_gui.h
 	src/geo_algos.h src/math_algos.h
 )
 
@@ -55,7 +55,7 @@ target_link_libraries(vis
 
 
 add_executable(lines
-	src/lines_gui.cpp src/lines_gui.h
+	src/gui/lines_gui.cpp src/gui/lines_gui.h
 	src/geo_algos.h src/math_algos.h
 )
 
@@ -65,7 +65,7 @@ target_link_libraries(lines
 
 
 add_executable(caster
-	src/caster_gui.cpp src/caster_gui.h
+	src/gui/caster_gui.cpp src/gui/caster_gui.h
 )
 
 target_link_libraries(caster

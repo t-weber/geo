@@ -356,6 +356,11 @@ void LinesView::UpdateIntersections()
 }
 
 
+void LinesView::SaveVoro(const std::string& filename) const
+{
+	// TODO
+}
+
 // ----------------------------------------------------------------------------
 
 
@@ -499,8 +504,18 @@ LinesWnd::LinesWnd(QWidget* pParent) : QMainWindow{pParent},
 	});
 
 	QAction *actionQuit = new QAction{"Exit", this};
-	connect(actionQuit, &QAction::triggered, [this]()
-		{ this->close(); });
+	connect(actionQuit, &QAction::triggered, [this]() { this->close(); });
+
+
+	QAction *actionVoro = new QAction{"Voronoi Region...", this};
+	connect(actionVoro, &QAction::triggered, [this]()
+	{
+		if(QString file = QFileDialog::getSaveFileName(this, "Export PNG", "",
+			"PNG Files (*.png)"); file!="")
+		{
+			m_view->SaveVoro(file.toStdString());
+		}
+	});
 
 
 	QAction *actionIntersDirect = new QAction{"Direct", this};
@@ -523,6 +538,7 @@ LinesWnd::LinesWnd(QWidget* pParent) : QMainWindow{pParent},
 
 	// menu
 	QMenu *menuFile = new QMenu{"File", this};
+	QMenu *menuCalc = new QMenu{"Calculate", this};
 	QMenu *menuBack = new QMenu{"Backend", this};
 
 	menuFile->addAction(actionNew);
@@ -534,6 +550,8 @@ LinesWnd::LinesWnd(QWidget* pParent) : QMainWindow{pParent},
 	menuFile->addSeparator();
 	menuFile->addAction(actionQuit);
 
+	menuCalc->addAction(actionVoro);
+
 	menuBack->addAction(actionIntersDirect);
 	menuBack->addAction(actionIntersSweep);
 
@@ -542,6 +560,7 @@ LinesWnd::LinesWnd(QWidget* pParent) : QMainWindow{pParent},
 	QMenuBar *menuBar = new QMenuBar{this};
 	menuBar->setNativeMenuBar(false);
 	menuBar->addMenu(menuFile);
+	menuBar->addMenu(menuCalc);
 	menuBar->addMenu(menuBack);
 	setMenuBar(menuBar);
 

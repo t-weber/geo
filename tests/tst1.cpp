@@ -26,5 +26,11 @@ int main()
 	std::cout << "inside 1: " << std::boolalpha << pt_inside_triag(tria1, tria2, tria3, pt1) << std::endl;
 	std::cout << "inside 2: " << std::boolalpha << pt_inside_triag(tria1, tria2, tria3, pt2) << std::endl;
 
+	std::cout << std::endl;
+
+	std::cout << "2-norm: " << m::norm<t_vec>(tria1) << std::endl;
+	std::cout << "2-norm: " << m::norm<t_vec>(tria1, 2.) << std::endl;
+	std::cout << "1-norm: " << m::norm<t_vec>(tria1, 1.) << std::endl;
+
 	return 0;
 }

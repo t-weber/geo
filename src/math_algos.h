@@ -520,6 +520,21 @@ requires is_basic_vec<t_vec>
 
 
 /**
+ * n-norm
+ */
+template<class t_vec, class t_real = typename t_vec::value_type>
+typename t_vec::value_type norm(const t_vec& vec, t_real n)
+requires is_basic_vec<t_vec>
+{
+	t_real d = t_real{0};
+	for(std::size_t i=0; i<vec.size(); ++i)
+		d += std::pow(std::abs(vec[i]), n);
+	n = std::pow(d, t_real(1)/n);
+	return n;
+}
+
+
+/**
  * outer product
  */
 template<class t_mat, class t_vec>
@@ -701,9 +716,9 @@ requires is_vec<t_vec>
 
 
 /**
- * project vector vec onto the line lineOrigin + lam*lineDir
- * shift line to go through origin, calculate projection and shift back
- * returns [closest point, distance]
+ * projects vector vec onto the line lineOrigin + lam*lineDir
+ * (shifts line to go through origin, calculates projection and shifts back)
+ * @returns [closest point, distance]
  */
 template<class t_vec>
 std::tuple<t_vec, typename t_vec::value_type> project_line(const t_vec& vec,
@@ -716,6 +731,52 @@ requires is_vec<t_vec>
 
 	const typename t_vec::value_type dist = norm<t_vec>(vec - ptNearest);
 	return std::make_tuple(ptNearest, dist);
+}
+
+
+/**
+ * distance between point and line
+ */
+template<class t_vec, class t_real = typename t_vec::value_type>
+t_real dist_pt_line(const t_vec& pt,
+	const t_vec& linePt1, const t_vec& linePt2,
+	bool bLineIsFinite=true)
+requires is_vec<t_vec>
+{
+	const std::size_t dim = linePt1.size();
+
+	const t_vec lineDir = linePt2 - linePt1;
+	const auto [nearestPt, dist] = project_line<t_vec>(pt, linePt1, lineDir, false);
+
+
+	// get point component with max. difference
+	t_real diff = -1.;
+	std::size_t compidx = 0;
+	for(std::size_t i=0; i<dim; ++i)
+	{
+		t_real newdiff = std::abs(linePt2[i] - linePt1[i]);
+		if(newdiff > diff)
+		{
+			diff = newdiff;
+			compidx = i;
+		}
+	}
+
+
+	t_real t = (nearestPt[compidx]-linePt1[compidx]) / (linePt2[compidx]-linePt1[compidx]);
+	if(bLineIsFinite && t>=t_real{0} && t<=t_real{1})
+	{
+		// projection is on line -> use distance between point and projection
+		return dist;
+	}
+	else
+	{
+		// projection is not on line -> use distance between point and closest line end point
+		if(std::abs(t-t_real{0}) < std::abs(t-t_real{1}))
+			return norm<t_vec>(linePt1 - pt);
+		else
+			return norm<t_vec>(linePt2 - pt);
+	}
 }
 
 

@@ -69,6 +69,8 @@ public:
 
 	void SetIntersectionCalculationMethod(IntersectionCalculationMethod m);
 
+	void SaveVoro(const std::string& filename) const;
+
 protected:
 	virtual void mousePressEvent(QMouseEvent *evt) override;
 	virtual void mouseReleaseEvent(QMouseEvent *evt) override;
