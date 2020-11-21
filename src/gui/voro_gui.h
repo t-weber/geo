@@ -59,15 +59,16 @@ enum class SpanCalculationMethod
 
 
 
-class HullView : public QGraphicsView
-{Q_OBJECT
+class HullScene : public QGraphicsScene
+{
 public:
-	HullView(QGraphicsScene *scene=nullptr, QWidget *parent=nullptr);
-	virtual ~HullView();
+	HullScene(QWidget* parent);
+	virtual ~HullScene();
 
-	HullView(HullView&) = delete;
-	const HullView& operator=(const HullView&) const = delete;
+	HullScene(HullScene&) = delete;
+	const HullScene& operator=(const HullScene&) const = delete;
 
+public:
 	void SetCalculateHull(bool b);
 	void SetCalculateVoronoiVertices(bool b);
 	void SetCalculateVoronoiRegions(bool b);
@@ -87,28 +88,20 @@ public:
 	void AddVertex(const QPointF& pos);
 	void ClearVertices();
 	const std::unordered_set<Vertex*>& GetVertices() const { return m_vertices; }
+	std::unordered_set<Vertex*>& GetVertices() { return m_vertices; }
 
 	void UpdateAll();
-
-protected:
-	virtual void mousePressEvent(QMouseEvent *evt) override;
-	virtual void mouseReleaseEvent(QMouseEvent *evt) override;
-	virtual void mouseMoveEvent(QMouseEvent *evt) override;
-
-	virtual void resizeEvent(QResizeEvent *evt) override;
-
 	void UpdateHull();
 	void UpdateDelaunay();
 
 private:
-	QGraphicsScene *m_scene = nullptr;
+	QWidget *m_parent = nullptr;
 
 	std::unordered_set<Vertex*> m_vertices{};
 	std::unordered_set<QGraphicsItem*> m_hull{};
 	std::unordered_set<QGraphicsItem*> m_voronoi{};
 	std::unordered_set<QGraphicsItem*> m_delaunay{};
 
-	bool m_dragging = false;
 	bool m_calchull = true;
 	bool m_calcvoronoivertices = false;
 	bool m_calcvoronoiregions = true;
@@ -118,6 +111,29 @@ private:
 	HullCalculationMethod m_hullcalculationmethod = HullCalculationMethod::QHULL;
 	DelaunayCalculationMethod m_delaunaycalculationmethod = DelaunayCalculationMethod::QHULL;
 	SpanCalculationMethod m_spancalculationmethod = SpanCalculationMethod::KRUSKAL;
+};
+
+
+
+class HullView : public QGraphicsView
+{Q_OBJECT
+public:
+	HullView(HullScene *scene=nullptr, QWidget *parent=nullptr);
+	virtual ~HullView();
+
+	HullView(HullView&) = delete;
+	const HullView& operator=(const HullView&) const = delete;
+
+protected:
+	virtual void mousePressEvent(QMouseEvent *evt) override;
+	virtual void mouseReleaseEvent(QMouseEvent *evt) override;
+	virtual void mouseMoveEvent(QMouseEvent *evt) override;
+
+	virtual void resizeEvent(QResizeEvent *evt) override;
+
+private:
+	HullScene *m_scene = nullptr;
+	bool m_dragging = false;
 
 signals:
 	void SignalMouseCoordinates(double x, double y);
@@ -139,7 +155,7 @@ private:
 	virtual void closeEvent(QCloseEvent *) override;
 
 private:
-	std::shared_ptr<QGraphicsScene> m_scene;
+	std::shared_ptr<HullScene> m_scene;
 	std::shared_ptr<HullView> m_view;
 	std::shared_ptr<QLabel> m_statusLabel;
 };

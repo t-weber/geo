@@ -84,209 +84,87 @@ void Vertex::paint(QPainter* painter, const QStyleOptionGraphicsItem*, QWidget*)
 
 
 
-
 // ----------------------------------------------------------------------------
 
-HullView::HullView(QGraphicsScene *scene, QWidget *parent) : QGraphicsView(scene, parent),
-	m_scene{scene}
+HullScene::HullScene(QWidget* parent) : QGraphicsScene(parent), m_parent{parent}
 {
-	setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
-	setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
-
-	setInteractive(true);
-	setMouseTracking(true);
-
-	//scale(1., -1.);
-
-	setBackgroundBrush(QBrush{QColor::fromRgbF(0.95, 0.95, 0.95, 1.)});
 }
 
-
-HullView::~HullView()
+HullScene::~HullScene()
 {
 }
 
 
-void HullView::resizeEvent(QResizeEvent *evt)
-{
-	QPointF pt1{mapToScene(QPoint{0,0})};
-	QPointF pt2{mapToScene(QPoint{evt->size().width(), evt->size().height()})};
-
-	const double padding = 16;
-
-	// include bounds given by vertices
-	for(const Vertex* vertex : m_vertices)
-	{
-		QPointF vertexpos = vertex->scenePos();
-
-		if(vertexpos.x() < pt1.x())
-			pt1.setX(vertexpos.x() -  padding);
-		if(vertexpos.x() > pt2.x())
-			pt2.setX(vertexpos.x() +  padding);
-		if(vertexpos.y() < pt1.y())
-			pt1.setY(vertexpos.y() -  padding);
-		if(vertexpos.y() > pt2.y())
-			pt2.setY(vertexpos.y() +  padding);
-	}
-
-	setSceneRect(QRectF{pt1, pt2});
-}
-
-
-
-void HullView::AddVertex(const QPointF& pos)
+void HullScene::AddVertex(const QPointF& pos)
 {
 	Vertex *vertex = new Vertex{pos};
 	m_vertices.insert(vertex);
-	m_scene->addItem(vertex);
+	addItem(vertex);
 }
 
 
-void HullView::mousePressEvent(QMouseEvent *evt)
-{
-	QPoint posVP = evt->pos();
-	QPointF posScene = mapToScene(posVP);
 
-	QList<QGraphicsItem*> items = this->items(posVP);
-	QGraphicsItem* item = nullptr;
-	bool item_is_vertex = false;
-
-	for(int itemidx=0; itemidx<items.size(); ++itemidx)
-	{
-		item = items[itemidx];
-		item_is_vertex = m_vertices.find(static_cast<Vertex*>(item)) != m_vertices.end();
-		if(item_is_vertex)
-			break;
-	}
-
-	// only select vertices
-	if(!item_is_vertex)
-		item = nullptr;
-
-
-	if(evt->button() == Qt::LeftButton)
-	{
-		// if no vertex is at this position, create a new one
-		if(!item)
-		{
-			AddVertex(posScene);
-			m_dragging = true;
-			UpdateAll();
-		}
-
-		else
-		{
-			// vertex is being dragged
-			if(item_is_vertex)
-			{
-				m_dragging = true;
-			}
-		}
-	}
-	else if(evt->button() == Qt::RightButton)
-	{
-		// if a vertex is at this position, remove it
-		if(item && item_is_vertex)
-		{
-			m_scene->removeItem(item);
-			m_vertices.erase(static_cast<Vertex*>(item));
-			delete item;
-			UpdateAll();
-		}
-	}
-
-	QGraphicsView::mousePressEvent(evt);
-}
-
-
-void HullView::mouseReleaseEvent(QMouseEvent *evt)
-{
-	if(evt->button() == Qt::LeftButton)
-		m_dragging = false;
-
-	UpdateAll();
-	QGraphicsView::mouseReleaseEvent(evt);
-}
-
-
-void HullView::mouseMoveEvent(QMouseEvent *evt)
-{
-	QGraphicsView::mouseMoveEvent(evt);
-
-	if(m_dragging)
-	{
-		QResizeEvent evt{size(), size()};
-		resizeEvent(&evt);
-		UpdateAll();
-	}
-
-	QPoint posVP = evt->pos();
-	QPointF posScene = mapToScene(posVP);
-	emit SignalMouseCoordinates(posScene.x(), posScene.y());
-}
-
-
-void HullView::SetCalculateHull(bool b)
+void HullScene::SetCalculateHull(bool b)
 {
 	m_calchull = b;
 	UpdateHull();
 }
 
 
-void HullView::SetCalculateVoronoiVertices(bool b)
+void HullScene::SetCalculateVoronoiVertices(bool b)
 {
 	m_calcvoronoivertices = b;
 	UpdateDelaunay();
 }
 
 
-void HullView::SetCalculateVoronoiRegions(bool b)
+void HullScene::SetCalculateVoronoiRegions(bool b)
 {
 	m_calcvoronoiregions = b;
 	UpdateDelaunay();
 }
 
 
-void HullView::SetCalculateDelaunay(bool b)
+void HullScene::SetCalculateDelaunay(bool b)
 {
 	m_calcdelaunay = b;
 	UpdateDelaunay();
 }
 
 
-void HullView::SetCalculateKruskal(bool b)
+void HullScene::SetCalculateKruskal(bool b)
 {
 	m_calckruskal = b;
 	UpdateDelaunay();
 }
 
 
-void HullView::SetHullCalculationMethod(HullCalculationMethod m)
+void HullScene::SetHullCalculationMethod(HullCalculationMethod m)
 {
 	m_hullcalculationmethod = m;
 	UpdateHull();
 }
 
 
-void HullView::SetDelaunayCalculationMethod(DelaunayCalculationMethod m)
+void HullScene::SetDelaunayCalculationMethod(DelaunayCalculationMethod m)
 {
 	m_delaunaycalculationmethod = m;
 	UpdateDelaunay();
 }
 
 
-void HullView::SetSpanCalculationMethod(SpanCalculationMethod m)
+void HullScene::SetSpanCalculationMethod(SpanCalculationMethod m)
 {
 	m_spancalculationmethod = m;
 	UpdateDelaunay();
 }
 
 
-void HullView::ClearVertices()
+void HullScene::ClearVertices()
 {
 	for(Vertex* vertex : m_vertices)
 	{
-		m_scene->removeItem(vertex);
+		removeItem(vertex);
 		delete vertex;
 	}
 	m_vertices.clear();
@@ -295,19 +173,19 @@ void HullView::ClearVertices()
 }
 
 
-void HullView::UpdateAll()
+void HullScene::UpdateAll()
 {
 	UpdateDelaunay();
 	UpdateHull();
 }
 
 
-void HullView::UpdateHull()
+void HullScene::UpdateHull()
 {
 	// remove previous hull
 	for(QGraphicsItem* hullItem : m_hull)
 	{
-		m_scene->removeItem(hullItem);
+		removeItem(hullItem);
 		delete hullItem;
 	}
 	m_hull.clear();
@@ -318,7 +196,7 @@ void HullView::UpdateHull()
 	std::vector<t_vec> vertices;
 	vertices.reserve(m_vertices.size());
 	std::transform(m_vertices.begin(), m_vertices.end(), std::back_inserter(vertices),
-		[](const Vertex* vert) -> t_vec { return m::create<t_vec>({vert->x(), vert->y()}); } );
+				   [](const Vertex* vert) -> t_vec { return m::create<t_vec>({vert->x(), vert->y()}); } );
 
 
 	std::vector<std::vector<t_vec>> hull;
@@ -339,20 +217,20 @@ void HullView::UpdateHull()
 			hull.emplace_back(calc_hull_recursive<t_vec>(vertices, g_eps));
 			break;
 		default:
-			QMessageBox::critical(this, "Error", "Unknown hull calculation method.");
+			QMessageBox::critical(m_parent, "Error", "Unknown hull calculation method.");
 			break;
 	}
 
 
-#ifdef HULL_CHECK
+	#ifdef HULL_CHECK
 	std::vector<t_vec> hullvertices;
 	for(const auto& thetriag : hull)
 		for(std::size_t idx1=0; idx1<thetriag.size(); ++idx1)
 			hullvertices.emplace_back(thetriag[idx1]);
-#endif
+		#endif
 
-	// convex hull
-	QPen penHull;
+		// convex hull
+		QPen penHull;
 	penHull.setWidthF(2.);
 
 	for(const auto& thetriag : hull)
@@ -365,25 +243,25 @@ void HullView::UpdateHull()
 			if(idx1 == idx2)
 				continue;
 
-#ifdef HULL_CHECK
+			#ifdef HULL_CHECK
 			if(!all_points_on_same_side(thetriag[idx1], thetriag[idx2], hullvertices, g_eps))
 				continue;
-#endif
+			#endif
 
 			QLineF line{QPointF{thetriag[idx1][0], thetriag[idx1][1]}, QPointF{thetriag[idx2][0], thetriag[idx2][1]}};
-			QGraphicsItem *item = m_scene->addLine(line, penHull);
+			QGraphicsItem *item = addLine(line, penHull);
 			m_hull.insert(item);
 		}
 	}
 }
 
 
-void HullView::UpdateDelaunay()
+void HullScene::UpdateDelaunay()
 {
 	// remove previous triangulation
 	for(QGraphicsItem* item : m_delaunay)
 	{
-		m_scene->removeItem(item);
+		removeItem(item);
 		delete item;
 	}
 	m_delaunay.clear();
@@ -391,7 +269,7 @@ void HullView::UpdateDelaunay()
 	// remove previous voronoi vertices
 	for(QGraphicsItem* item : m_voronoi)
 	{
-		m_scene->removeItem(item);
+		removeItem(item);
 		delete item;
 	}
 	m_voronoi.clear();
@@ -407,7 +285,7 @@ void HullView::UpdateDelaunay()
 	std::vector<t_vec> vertices;
 	vertices.reserve(m_vertices.size());
 	std::transform(m_vertices.begin(), m_vertices.end(), std::back_inserter(vertices),
-		[](const Vertex* vert) -> t_vec { return m::create<t_vec>({vert->x(), vert->y()}); } );
+				   [](const Vertex* vert) -> t_vec { return m::create<t_vec>({vert->x(), vert->y()}); } );
 
 
 	std::vector<t_vec> voronoi{};
@@ -426,7 +304,7 @@ void HullView::UpdateDelaunay()
 			std::tie(voronoi, triags, neighbours) = calc_delaunay_parabolic<t_vec>(vertices);
 			break;
 		default:
-			QMessageBox::critical(this, "Error", "Unknown Delaunay calculation method.");
+			QMessageBox::critical(m_parent, "Error", "Unknown Delaunay calculation method.");
 			break;
 	}
 
@@ -454,7 +332,7 @@ void HullView::UpdateDelaunay()
 			const t_vec& voronoivert = voronoi[idx];
 
 			QPointF voronoipt{voronoivert[0], voronoivert[1]};
-			QGraphicsItem *voronoiItem = m_scene->addEllipse(
+			QGraphicsItem *voronoiItem = addEllipse(
 				voronoipt.x()-itemRad/2., voronoipt.y()-itemRad/2., itemRad, itemRad, penVoronoi, brushVoronoi);
 			m_voronoi.insert(voronoiItem);
 
@@ -466,7 +344,7 @@ void HullView::UpdateDelaunay()
 				{
 					t_real rad = m::norm(voronoivert-triag[0]);
 
-					QGraphicsItem *voronoiCircle = m_scene->addEllipse(
+					QGraphicsItem *voronoiCircle = addEllipse(
 						voronoipt.x()-rad, voronoipt.y()-rad, rad*2., rad*2., penCircle);
 					m_voronoi.insert(voronoiCircle);
 				}
@@ -500,7 +378,7 @@ void HullView::UpdateDelaunay()
 				neighbourverts.push_back(&neighbourvert);
 
 				QLineF line{QPointF{voronoivert[0], voronoivert[1]}, QPointF{neighbourvert[0], neighbourvert[1]}};
-				QGraphicsItem *item = m_scene->addLine(line, penVoronoi);
+				QGraphicsItem *item = addLine(line, penVoronoi);
 				m_voronoi.insert(item);
 			}
 
@@ -526,8 +404,8 @@ void HullView::UpdateDelaunay()
 
 					// if the slope angle doesn't exist yet, it leads to an unbound external region
 					if(auto iterSlope = std::find_if(slopes.begin(), slopes.end(), [angle](t_real angle2) -> bool
-						{ return m::angle_equals<t_real>(angle, angle2, g_eps, m::pi<t_real>); });
-						iterSlope == slopes.end())
+					{ return m::angle_equals<t_real>(angle, angle2, g_eps, m::pi<t_real>); });
+					iterSlope == slopes.end())
 					{
 						t_vec vecUnbound = (vecMid-voronoivert);
 						t_real lengthUnbound = 1000. / m::norm(vecUnbound);
@@ -540,7 +418,7 @@ void HullView::UpdateDelaunay()
 							vecOuter += lengthUnbound*vecUnbound;
 
 						QLineF line{QPointF{voronoivert[0], voronoivert[1]}, QPointF{vecOuter[0], vecOuter[1]}};
-						QGraphicsItem *item = m_scene->addLine(line, penVoronoiUnbound);
+						QGraphicsItem *item = addLine(line, penVoronoiUnbound);
 						m_voronoi.insert(item);
 					}
 				}
@@ -566,7 +444,7 @@ void HullView::UpdateDelaunay()
 					idx2 = 0;
 
 				QLineF line{QPointF{thetriag[idx1][0], thetriag[idx1][1]}, QPointF{thetriag[idx2][0], thetriag[idx2][1]}};
-				QGraphicsItem *item = m_scene->addLine(line, penDelaunay);
+				QGraphicsItem *item = addLine(line, penDelaunay);
 				m_delaunay.insert(item);
 			}
 		}
@@ -592,7 +470,7 @@ void HullView::UpdateDelaunay()
 				span = calc_min_spantree_boost<t_vec>(vertices);
 				break;
 			default:
-				QMessageBox::critical(this, "Error", "Unknown span tree calculation method.");
+				QMessageBox::critical(m_parent, "Error", "Unknown span tree calculation method.");
 				break;
 		}
 
@@ -602,10 +480,150 @@ void HullView::UpdateDelaunay()
 			const t_vec& vert2 = vertices[spanedge.second];
 
 			QLineF line{QPointF{vert1[0], vert1[1]}, QPointF{vert2[0], vert2[1]}};
-			QGraphicsItem *item = m_scene->addLine(line, penKruskal);
+			QGraphicsItem *item = addLine(line, penKruskal);
 			m_delaunay.insert(item);
 		}
 	}
+}
+
+
+// ----------------------------------------------------------------------------
+
+
+
+
+// ----------------------------------------------------------------------------
+
+HullView::HullView(HullScene *scene, QWidget *parent) : QGraphicsView(scene, parent),
+	m_scene{scene}
+{
+	setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
+	setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
+
+	setInteractive(true);
+	setMouseTracking(true);
+
+	//scale(1., -1.);
+
+	setBackgroundBrush(QBrush{QColor::fromRgbF(0.95, 0.95, 0.95, 1.)});
+}
+
+
+HullView::~HullView()
+{
+}
+
+
+void HullView::resizeEvent(QResizeEvent *evt)
+{
+	QPointF pt1{mapToScene(QPoint{0,0})};
+	QPointF pt2{mapToScene(QPoint{evt->size().width(), evt->size().height()})};
+
+	const double padding = 16;
+
+	// include bounds given by vertices
+	for(const Vertex* vertex : m_scene->GetVertices())
+	{
+		QPointF vertexpos = vertex->scenePos();
+
+		if(vertexpos.x() < pt1.x())
+			pt1.setX(vertexpos.x() -  padding);
+		if(vertexpos.x() > pt2.x())
+			pt2.setX(vertexpos.x() +  padding);
+		if(vertexpos.y() < pt1.y())
+			pt1.setY(vertexpos.y() -  padding);
+		if(vertexpos.y() > pt2.y())
+			pt2.setY(vertexpos.y() +  padding);
+	}
+
+	setSceneRect(QRectF{pt1, pt2});
+}
+
+
+
+void HullView::mousePressEvent(QMouseEvent *evt)
+{
+	QPoint posVP = evt->pos();
+	QPointF posScene = mapToScene(posVP);
+
+	QList<QGraphicsItem*> items = this->items(posVP);
+	QGraphicsItem* item = nullptr;
+	bool item_is_vertex = false;
+
+	auto& verts = m_scene->GetVertices();
+
+	for(int itemidx=0; itemidx<items.size(); ++itemidx)
+	{
+		item = items[itemidx];
+		item_is_vertex = verts.find(static_cast<Vertex*>(item)) != verts.end();
+		if(item_is_vertex)
+			break;
+	}
+
+	// only select vertices
+	if(!item_is_vertex)
+		item = nullptr;
+
+
+	if(evt->button() == Qt::LeftButton)
+	{
+		// if no vertex is at this position, create a new one
+		if(!item)
+		{
+			m_scene->AddVertex(posScene);
+			m_dragging = true;
+			m_scene->UpdateAll();
+		}
+
+		else
+		{
+			// vertex is being dragged
+			if(item_is_vertex)
+			{
+				m_dragging = true;
+			}
+		}
+	}
+	else if(evt->button() == Qt::RightButton)
+	{
+		// if a vertex is at this position, remove it
+		if(item && item_is_vertex)
+		{
+			m_scene->removeItem(item);
+			verts.erase(static_cast<Vertex*>(item));
+			delete item;
+			m_scene->UpdateAll();
+		}
+	}
+
+	QGraphicsView::mousePressEvent(evt);
+}
+
+
+void HullView::mouseReleaseEvent(QMouseEvent *evt)
+{
+	if(evt->button() == Qt::LeftButton)
+		m_dragging = false;
+
+	m_scene->UpdateAll();
+	QGraphicsView::mouseReleaseEvent(evt);
+}
+
+
+void HullView::mouseMoveEvent(QMouseEvent *evt)
+{
+	QGraphicsView::mouseMoveEvent(evt);
+
+	if(m_dragging)
+	{
+		QResizeEvent evt{size(), size()};
+		resizeEvent(&evt);
+		m_scene->UpdateAll();
+	}
+
+	QPoint posVP = evt->pos();
+	QPointF posScene = mapToScene(posVP);
+	emit SignalMouseCoordinates(posScene.x(), posScene.y());
 }
 
 // ----------------------------------------------------------------------------
@@ -616,7 +634,7 @@ void HullView::UpdateDelaunay()
 // ----------------------------------------------------------------------------
 
 HullWnd::HullWnd(QWidget* pParent) : QMainWindow{pParent},
-	m_scene{new QGraphicsScene{this}},
+	m_scene{new HullScene{this}},
 	m_view{new HullView{m_scene.get(), this}},
 	m_statusLabel{std::make_shared<QLabel>(this)}
 {
@@ -639,16 +657,16 @@ HullWnd::HullWnd(QWidget* pParent) : QMainWindow{pParent},
 		this->restoreState(arr);
 	}
 
-	m_view->SetCalculateHull(
-		settings.value("calc_hull", m_view->GetCalculateHull()).toBool());
-	m_view->SetCalculateVoronoiVertices(
-		settings.value("calc_voronoivertices", m_view->GetCalculateVoronoiVertices()).toBool());
-	m_view->SetCalculateVoronoiRegions(
-		settings.value("calc_voronoiregions", m_view->GetCalculateVoronoiRegions()).toBool());
-	m_view->SetCalculateDelaunay(
-		settings.value("calc_delaunay", m_view->GetCalculateDelaunay()).toBool());
-	m_view->SetCalculateKruskal(
-		settings.value("calc_kruskal", m_view->GetCalculateKruskal()).toBool());
+	m_scene->SetCalculateHull(
+		settings.value("calc_hull", m_scene->GetCalculateHull()).toBool());
+	m_scene->SetCalculateVoronoiVertices(
+		settings.value("calc_voronoivertices", m_scene->GetCalculateVoronoiVertices()).toBool());
+	m_scene->SetCalculateVoronoiRegions(
+		settings.value("calc_voronoiregions", m_scene->GetCalculateVoronoiRegions()).toBool());
+	m_scene->SetCalculateDelaunay(
+		settings.value("calc_delaunay", m_scene->GetCalculateDelaunay()).toBool());
+	m_scene->SetCalculateKruskal(
+		settings.value("calc_kruskal", m_scene->GetCalculateKruskal()).toBool());
 	// ------------------------------------------------------------------------
 
 
@@ -665,7 +683,7 @@ HullWnd::HullWnd(QWidget* pParent) : QMainWindow{pParent},
 	// menu actions
 	QAction *actionNew = new QAction{"New", this};
 	connect(actionNew, &QAction::triggered, [this]()
-		{ m_view->ClearVertices(); });
+		{ m_scene->ClearVertices(); });
 
 	QAction *actionLoad = new QAction{"Load...", this};
 	connect(actionLoad, &QAction::triggered, [this]()
@@ -680,7 +698,7 @@ HullWnd::HullWnd(QWidget* pParent) : QMainWindow{pParent},
 				return;
 			}
 
-			m_view->ClearVertices();
+			m_scene->ClearVertices();
 
 			ptree::ptree prop{};
 			ptree::read_xml(ifstr, prop);
@@ -701,13 +719,13 @@ HullWnd::HullWnd(QWidget* pParent) : QMainWindow{pParent},
 				if(!vertx || !verty)
 					break;
 
-				m_view->AddVertex(QPointF{*vertx, *verty});
+				m_scene->AddVertex(QPointF{*vertx, *verty});
 
 				++vertidx;
 			}
 
 			if(vertidx > 0)
-				m_view->UpdateAll();
+				m_scene->UpdateAll();
 			else
 				QMessageBox::warning(this, "Warning", "File contains no data.");
 		}
@@ -729,7 +747,7 @@ HullWnd::HullWnd(QWidget* pParent) : QMainWindow{pParent},
 			ptree::ptree prop{};
 
 			std::size_t vertidx = 0;
-			for(const Vertex* vertex : m_view->GetVertices())
+			for(const Vertex* vertex : m_scene->GetVertices())
 			{
 				QPointF vertexpos = vertex->scenePos();
 
@@ -769,84 +787,84 @@ HullWnd::HullWnd(QWidget* pParent) : QMainWindow{pParent},
 
 	QAction *actionHull = new QAction{"Convex Hull", this};
 	actionHull->setCheckable(true);
-	actionHull->setChecked(m_view->GetCalculateHull());
+	actionHull->setChecked(m_scene->GetCalculateHull());
 	connect(actionHull, &QAction::toggled, [this](bool b)
-		{ m_view->SetCalculateHull(b); });
+		{ m_scene->SetCalculateHull(b); });
 
 	QAction *actionVoronoi = new QAction{"Voronoi Vertices", this};
 	actionVoronoi->setCheckable(true);
-	actionVoronoi->setChecked(m_view->GetCalculateVoronoiVertices());
+	actionVoronoi->setChecked(m_scene->GetCalculateVoronoiVertices());
 	connect(actionVoronoi, &QAction::toggled, [this](bool b)
-		{ m_view->SetCalculateVoronoiVertices(b); });
+		{ m_scene->SetCalculateVoronoiVertices(b); });
 
 	QAction *actionVoronoiRegions = new QAction{"Voronoi Regions", this};
 	actionVoronoiRegions->setCheckable(true);
-	actionVoronoiRegions->setChecked(m_view->GetCalculateVoronoiRegions());
+	actionVoronoiRegions->setChecked(m_scene->GetCalculateVoronoiRegions());
 	connect(actionVoronoiRegions, &QAction::toggled, [this](bool b)
-		{ m_view->SetCalculateVoronoiRegions(b); });
+		{ m_scene->SetCalculateVoronoiRegions(b); });
 
 	QAction *actionDelaunay = new QAction{"Delaunay Triangulation", this};
 	actionDelaunay->setCheckable(true);
-	actionDelaunay->setChecked(m_view->GetCalculateDelaunay());
+	actionDelaunay->setChecked(m_scene->GetCalculateDelaunay());
 	connect(actionDelaunay, &QAction::toggled, [this](bool b)
-		{ m_view->SetCalculateDelaunay(b); });
+		{ m_scene->SetCalculateDelaunay(b); });
 
 	QAction *actionSpanTree = new QAction{"Minimum Spanning Tree", this};
 	actionSpanTree->setCheckable(true);
-	actionSpanTree->setChecked(m_view->GetCalculateKruskal());
+	actionSpanTree->setChecked(m_scene->GetCalculateKruskal());
 	connect(actionSpanTree, &QAction::toggled, [this](bool b)
-	{ m_view->SetCalculateKruskal(b); });
+		{ m_scene->SetCalculateKruskal(b); });
 
 
 	QAction *actionHullQHull = new QAction{"QHull", this};
 	actionHullQHull->setCheckable(true);
 	actionHullQHull->setChecked(true);
 	connect(actionHullQHull, &QAction::toggled, [this]()
-		{ m_view->SetHullCalculationMethod(HullCalculationMethod::QHULL); });
+		{ m_scene->SetHullCalculationMethod(HullCalculationMethod::QHULL); });
 
 	QAction *actionHullContour = new QAction{"Contour", this};
 	actionHullContour->setCheckable(true);
 	connect(actionHullContour, &QAction::toggled, [this]()
-		{ m_view->SetHullCalculationMethod(HullCalculationMethod::CONTOUR); });
+		{ m_scene->SetHullCalculationMethod(HullCalculationMethod::CONTOUR); });
 
 	QAction *actionHullInc = new QAction{"Incremental", this};
 	actionHullInc->setCheckable(true);
 	connect(actionHullInc, &QAction::toggled, [this]()
-	{ m_view->SetHullCalculationMethod(HullCalculationMethod::ITERATIVE); });
+		{ m_scene->SetHullCalculationMethod(HullCalculationMethod::ITERATIVE); });
 
 	QAction *actionHullDivide = new QAction{"Divide && Conquer", this};
 	actionHullDivide->setCheckable(true);
 	connect(actionHullDivide, &QAction::toggled, [this]()
-		{ m_view->SetHullCalculationMethod(HullCalculationMethod::RECURSIVE); });
+		{ m_scene->SetHullCalculationMethod(HullCalculationMethod::RECURSIVE); });
 
 
 	QAction *actionDelaunayQHull = new QAction{"QHull", this};
 	actionDelaunayQHull->setCheckable(true);
 	actionDelaunayQHull->setChecked(true);
 	connect(actionDelaunayQHull, &QAction::toggled, [this]()
-		{ m_view->SetDelaunayCalculationMethod(DelaunayCalculationMethod::QHULL); });
+		{ m_scene->SetDelaunayCalculationMethod(DelaunayCalculationMethod::QHULL); });
 
 	QAction *actionDelaunayInc = new QAction{"Incremental", this};
 	actionDelaunayInc->setCheckable(true);
 	connect(actionDelaunayInc, &QAction::toggled, [this]()
-	{ m_view->SetDelaunayCalculationMethod(DelaunayCalculationMethod::ITERATIVE); });
+		{ m_scene->SetDelaunayCalculationMethod(DelaunayCalculationMethod::ITERATIVE); });
 
 	QAction *actionDelaunayPara = new QAction{"Parabolic Trafo", this};
 	actionDelaunayPara->setCheckable(true);
 	connect(actionDelaunayPara, &QAction::toggled, [this]()
-		{ m_view->SetDelaunayCalculationMethod(DelaunayCalculationMethod::PARABOLIC); });
+		{ m_scene->SetDelaunayCalculationMethod(DelaunayCalculationMethod::PARABOLIC); });
 
 
 	QAction *actionSpanKruskal = new QAction{"Kruskal", this};
 	actionSpanKruskal->setCheckable(true);
 	actionSpanKruskal->setChecked(true);
 	connect(actionSpanKruskal, &QAction::toggled, [this]()
-	{ m_view->SetSpanCalculationMethod(SpanCalculationMethod::KRUSKAL); });
+		{ m_scene->SetSpanCalculationMethod(SpanCalculationMethod::KRUSKAL); });
 
 	QAction *actionSpanBoost = new QAction{"Boost.Graph", this};
 	actionSpanBoost->setCheckable(true);
 	connect(actionSpanBoost, &QAction::toggled, [this]()
-		{ m_view->SetSpanCalculationMethod(SpanCalculationMethod::BOOST); });
+		{ m_scene->SetSpanCalculationMethod(SpanCalculationMethod::BOOST); });
 
 
 	QActionGroup *groupHullBack = new QActionGroup{this};
@@ -943,11 +961,11 @@ void HullWnd::closeEvent(QCloseEvent *e)
 	QByteArray geo{this->saveGeometry()}, state{this->saveState()};
 	settings.setValue("wnd_geo", geo);
 	settings.setValue("wnd_state", state);
-	settings.setValue("calc_hull", m_view->GetCalculateHull());
-	settings.setValue("calc_voronoivertices", m_view->GetCalculateVoronoiVertices());
-	settings.setValue("calc_voronoiregions", m_view->GetCalculateVoronoiRegions());
-	settings.setValue("calc_delaunay", m_view->GetCalculateDelaunay());
-	settings.setValue("calc_kruskal", m_view->GetCalculateKruskal());
+	settings.setValue("calc_hull", m_scene->GetCalculateHull());
+	settings.setValue("calc_voronoivertices", m_scene->GetCalculateVoronoiVertices());
+	settings.setValue("calc_voronoiregions", m_scene->GetCalculateVoronoiRegions());
+	settings.setValue("calc_delaunay", m_scene->GetCalculateDelaunay());
+	settings.setValue("calc_kruskal", m_scene->GetCalculateKruskal());
 	// ------------------------------------------------------------------------
 
 	QMainWindow::closeEvent(e);
