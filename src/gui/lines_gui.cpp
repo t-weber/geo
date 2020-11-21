@@ -16,12 +16,20 @@
 #include <QSvgGenerator>
 #include <QMessageBox>
 #include <QSettings>
+#include <QProgressDialog>
 
 #include <locale>
 #include <memory>
 #include <array>
 #include <vector>
+#include <unordered_map>
+#include <thread>
+#include <mutex>
+#include <future>
 #include <iostream>
+
+#include <boost/asio.hpp>
+namespace asio = boost::asio;
 
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/xml_parser.hpp>
@@ -86,13 +94,14 @@ LinesView::LinesView(QGraphicsScene *scene, QWidget *parent) : QGraphicsView(sce
 	setMouseTracking(true);
 
 	//scale(1., -1.);
-
-	setBackgroundBrush(QBrush{QColor::fromRgbF(0.95, 0.95, 0.95, 1.)});
+	ClearVertices();
 }
 
 
 LinesView::~LinesView()
 {
+	if(m_elem_voro)
+		delete m_elem_voro;
 }
 
 
@@ -117,6 +126,10 @@ void LinesView::resizeEvent(QResizeEvent *evt)
 		if(vertexpos.y() > pt2.y())
 			pt2.setY(vertexpos.y() +  padding);
 	}
+
+	if(m_elem_voro)
+		delete m_elem_voro;
+	m_elem_voro = new QImage(evt->size().width(), evt->size().height(), QImage::Format_RGB32);
 
 	setSceneRect(QRectF{pt1, pt2});
 }
@@ -239,6 +252,7 @@ void LinesView::ClearVertices()
 	}
 	m_elems_vertices.clear();
 
+	setBackgroundBrush(QBrush{QColor::fromRgbF(0.95, 0.95, 0.95, 1.)});
 	UpdateAll();
 }
 
@@ -356,9 +370,100 @@ void LinesView::UpdateIntersections()
 }
 
 
-void LinesView::SaveVoro(const std::string& filename) const
+void LinesView::UpdateVoro()
 {
-	// TODO
+	if(!m_elem_voro)
+		return;
+
+	const int width = m_elem_voro->width();
+	const int height = m_elem_voro->height();
+
+	QProgressDialog progdlg(this);
+	progdlg.setWindowModality(Qt::WindowModal);
+	progdlg.setMinimum(0);
+	progdlg.setMaximum(height);
+	progdlg.setLabel(new QLabel("Calculating Voronoi Regions..."));
+
+
+	unsigned int num_threads = std::thread::hardware_concurrency();
+	if(num_threads > 8)
+		num_threads = 8;
+	asio::thread_pool tp{num_threads};
+
+	std::vector<std::shared_ptr<std::packaged_task<void()>>> packages;
+	std::mutex mtx;
+
+	std::unordered_map<std::size_t, QColor> linecolours;
+
+	for(int y=0; y<height; ++y)
+	{
+		auto package = std::make_shared<std::packaged_task<void()>>(
+		[this, y, width, &linecolours, &mtx]() -> void
+		{
+			for(int x=0; x<width; ++x)
+			{
+				t_vec pt = m::create<t_vec>({t_real(x), t_real(y)});
+				std::size_t lineidx = GetClosestLineIdx(pt);
+
+				// get colour for voronoi region
+				QColor col{0xff, 0xff, 0xff, 0xff};
+
+				auto iter = linecolours.find(lineidx);
+				if(iter != linecolours.end())
+				{
+					col = iter->second;
+				}
+				else
+				{
+					col.setRgb(get_rand<int>(0,0xff), get_rand<int>(0,0xff), get_rand<int>(0,0xff));
+
+					std::lock_guard<std::mutex> _lck(mtx);
+					linecolours.insert(std::make_pair(lineidx, col));
+				}
+
+				m_elem_voro->setPixelColor(x, y, col);
+			}
+		});
+
+		packages.push_back(package);
+		asio::post(tp, [package]() -> void { if(package) (*package)(); });
+	}
+
+	for(int y=0; y<height; ++y)
+	{
+		if(progdlg.wasCanceled())
+			break;
+		progdlg.setValue(y);
+
+		if(packages[y])
+			packages[y]->get_future().get();
+	}
+
+	tp.join();
+	progdlg.setValue(m_elem_voro->height());
+
+	setBackgroundBrush(*m_elem_voro);
+}
+
+
+std::size_t LinesView::GetClosestLineIdx(const t_vec& pt) const
+{
+	t_real mindist = std::numeric_limits<t_real>::max();
+	std::size_t minidx = 0;
+
+	for(std::size_t idx=0; idx<m_lines.size(); ++idx)
+	{
+		const auto& line = m_lines[idx];
+
+		t_real dist = dist_pt_line(pt, line.first, line.second, true);
+		if(dist < mindist)
+		{
+			mindist = dist;
+			minidx = idx;
+		}
+	}
+
+	return minidx;
 }
 
 // ----------------------------------------------------------------------------
@@ -507,14 +612,10 @@ LinesWnd::LinesWnd(QWidget* pParent) : QMainWindow{pParent},
 	connect(actionQuit, &QAction::triggered, [this]() { this->close(); });
 
 
-	QAction *actionVoro = new QAction{"Voronoi Region...", this};
+	QAction *actionVoro = new QAction{"Voronoi Regions", this};
 	connect(actionVoro, &QAction::triggered, [this]()
 	{
-		if(QString file = QFileDialog::getSaveFileName(this, "Export PNG", "",
-			"PNG Files (*.png)"); file!="")
-		{
-			m_view->SaveVoro(file.toStdString());
-		}
+		m_view->UpdateVoro();
 	});
 
 

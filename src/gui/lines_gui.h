@@ -14,6 +14,9 @@
 #include <QGraphicsView>
 #include <QGraphicsScene>
 #include <QGraphicsItem>
+#include <QImage>
+//#include <QGraphicsPixmapItem>
+//#include <QPixmap>
 
 #include <memory>
 #include <vector>
@@ -51,7 +54,6 @@ public:
 
 	static const constexpr t_real g_eps = 1e-5;
 
-
 public:
 	LinesView(QGraphicsScene *scene=nullptr, QWidget *parent=nullptr);
 	virtual ~LinesView();
@@ -69,7 +71,7 @@ public:
 
 	void SetIntersectionCalculationMethod(IntersectionCalculationMethod m);
 
-	void SaveVoro(const std::string& filename) const;
+	void UpdateVoro();
 
 protected:
 	virtual void mousePressEvent(QMouseEvent *evt) override;
@@ -83,12 +85,16 @@ private:
 
 	std::vector<Vertex*> m_elems_vertices{};
 	std::vector<QGraphicsItem*> m_elems_lines{}, m_elems_inters{};
+	QImage *m_elem_voro = nullptr;
 
 	bool m_dragging = false;
 
 	std::vector<std::pair<t_vec, t_vec>> m_lines{};
 
 	IntersectionCalculationMethod m_intersectioncalculationmethod = IntersectionCalculationMethod::SWEEP;
+
+private:
+	std::size_t GetClosestLineIdx(const t_vec& pt) const;
 
 signals:
 	void SignalMouseCoordinates(double x, double y);
