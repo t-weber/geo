@@ -36,6 +36,7 @@ namespace asio = boost::asio;
 namespace ptree = boost::property_tree;
 
 
+
 // ----------------------------------------------------------------------------
 
 Vertex::Vertex(const QPointF& pos, double rad) : m_rad{rad}
@@ -84,170 +85,40 @@ void Vertex::paint(QPainter* painter, const QStyleOptionGraphicsItem*, QWidget*)
 
 // ----------------------------------------------------------------------------
 
-LinesView::LinesView(QGraphicsScene *scene, QWidget *parent) : QGraphicsView(scene, parent),
-	m_scene{scene}
+LinesScene::LinesScene(QWidget *parent) : QGraphicsScene(parent), m_parent{parent}
 {
-	setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
-	setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
-
-	setInteractive(true);
-	setMouseTracking(true);
-
-	//scale(1., -1.);
 	ClearVertices();
 }
 
 
-LinesView::~LinesView()
+LinesScene::~LinesScene()
 {
 	if(m_elem_voro)
 		delete m_elem_voro;
 }
 
 
-void LinesView::resizeEvent(QResizeEvent *evt)
+void LinesScene::CreateVoroImage(int width, int height)
 {
-	QPointF pt1{mapToScene(QPoint{0,0})};
-	QPointF pt2{mapToScene(QPoint{evt->size().width(), evt->size().height()})};
-
-	const double padding = 16;
-
-	// include bounds given by vertices
-	for(const Vertex* vertex : m_elems_vertices)
-	{
-		QPointF vertexpos = vertex->scenePos();
-
-		if(vertexpos.x() < pt1.x())
-			pt1.setX(vertexpos.x() -  padding);
-		if(vertexpos.x() > pt2.x())
-			pt2.setX(vertexpos.x() +  padding);
-		if(vertexpos.y() < pt1.y())
-			pt1.setY(vertexpos.y() -  padding);
-		if(vertexpos.y() > pt2.y())
-			pt2.setY(vertexpos.y() +  padding);
-	}
-
 	if(m_elem_voro)
 		delete m_elem_voro;
-	m_elem_voro = new QImage(evt->size().width(), evt->size().height(), QImage::Format_RGB32);
-
-	setSceneRect(QRectF{pt1, pt2});
+	m_elem_voro = new QImage(width, height, QImage::Format_RGB32);
 }
 
 
-
-void LinesView::AddVertex(const QPointF& pos)
+void LinesScene::AddVertex(const QPointF& pos)
 {
 	Vertex *vertex = new Vertex{pos};
 	m_elems_vertices.push_back(vertex);
-	m_scene->addItem(vertex);
+	addItem(vertex);
 }
 
 
-void LinesView::mousePressEvent(QMouseEvent *evt)
-{
-	QPoint posVP = evt->pos();
-	QPointF posScene = mapToScene(posVP);
-
-	QList<QGraphicsItem*> items = this->items(posVP);
-	QGraphicsItem* item = nullptr;
-	bool item_is_vertex = false;
-
-	for(int itemidx=0; itemidx<items.size(); ++itemidx)
-	{
-		item = items[itemidx];
-		auto iter = std::find(m_elems_vertices.begin(), m_elems_vertices.end(), static_cast<Vertex*>(item));
-		item_is_vertex = (iter != m_elems_vertices.end());
-		if(item_is_vertex)
-			break;
-	}
-
-	// only select vertices
-	if(!item_is_vertex)
-		item = nullptr;
-
-
-	if(evt->button() == Qt::LeftButton)
-	{
-		// if no vertex is at this position, create a new one
-		if(!item)
-		{
-			AddVertex(posScene);
-			m_dragging = true;
-			UpdateAll();
-		}
-
-		else
-		{
-			// vertex is being dragged
-			if(item_is_vertex)
-			{
-				m_dragging = true;
-			}
-		}
-	}
-	else if(evt->button() == Qt::RightButton)
-	{
-		// if a vertex is at this position, remove it
-		if(item && item_is_vertex)
-		{
-			m_scene->removeItem(item);
-			auto iter = std::find(m_elems_vertices.begin(), m_elems_vertices.end(), static_cast<Vertex*>(item));
-
-			std::size_t idx = iter - m_elems_vertices.begin();
-			if(iter != m_elems_vertices.end())
-				iter = m_elems_vertices.erase(iter);
-			delete item;
-
-			// move remaining vertex of line to the end
-			std::size_t otheridx = (idx % 2 == 0 ? idx : idx-1);
-			if(otheridx < m_elems_vertices.size())
-			{
-				Vertex* vert = m_elems_vertices[otheridx];
-				m_elems_vertices.erase(m_elems_vertices.begin()+otheridx);
-				m_elems_vertices.push_back(vert);
-			}
-
-			UpdateAll();
-		}
-	}
-
-	QGraphicsView::mousePressEvent(evt);
-}
-
-
-void LinesView::mouseReleaseEvent(QMouseEvent *evt)
-{
-	if(evt->button() == Qt::LeftButton)
-		m_dragging = false;
-
-	UpdateAll();
-	QGraphicsView::mouseReleaseEvent(evt);
-}
-
-
-void LinesView::mouseMoveEvent(QMouseEvent *evt)
-{
-	QGraphicsView::mouseMoveEvent(evt);
-
-	if(m_dragging)
-	{
-		QResizeEvent evt{size(), size()};
-		resizeEvent(&evt);
-		UpdateAll();
-	}
-
-	QPoint posVP = evt->pos();
-	QPointF posScene = mapToScene(posVP);
-	emit SignalMouseCoordinates(posScene.x(), posScene.y());
-}
-
-
-void LinesView::ClearVertices()
+void LinesScene::ClearVertices()
 {
 	for(Vertex* vertex : m_elems_vertices)
 	{
-		m_scene->removeItem(vertex);
+		removeItem(vertex);
 		delete vertex;
 	}
 	m_elems_vertices.clear();
@@ -257,26 +128,26 @@ void LinesView::ClearVertices()
 }
 
 
-void LinesView::SetIntersectionCalculationMethod(IntersectionCalculationMethod m)
+void LinesScene::SetIntersectionCalculationMethod(IntersectionCalculationMethod m)
 {
 	m_intersectioncalculationmethod = m;
 	UpdateIntersections();
 }
 
 
-void LinesView::UpdateAll()
+void LinesScene::UpdateAll()
 {
 	UpdateLines();
 	UpdateIntersections();
 }
 
 
-void LinesView::UpdateLines()
+void LinesScene::UpdateLines()
 {
 	// remove previous lines
 	for(QGraphicsItem* item : m_elems_lines)
 	{
-		m_scene->removeItem(item);
+		removeItem(item);
 		delete item;
 	}
 	m_elems_lines.clear();
@@ -316,18 +187,18 @@ void LinesView::UpdateLines()
 		const t_vec& vertex2 = line.second;
 
 		QLineF qline{QPointF{vertex1[0], vertex1[1]}, QPointF{vertex2[0], vertex2[1]}};
-		QGraphicsItem *item = m_scene->addLine(qline, penEdge);
+		QGraphicsItem *item = addLine(qline, penEdge);
 		m_elems_lines.push_back(item);
 	}
 }
 
 
-void LinesView::UpdateIntersections()
+void LinesScene::UpdateIntersections()
 {
 	// remove previous intersection points
 	for(QGraphicsItem* item : m_elems_inters)
 	{
-		m_scene->removeItem(item);
+		removeItem(item);
 		delete item;
 	}
 	m_elems_inters.clear();
@@ -344,7 +215,7 @@ void LinesView::UpdateIntersections()
 			intersections = intersect_sweep<t_vec, std::pair<t_vec, t_vec>>(m_lines, g_eps);
 			break;
 		default:
-			QMessageBox::critical(this, "Error", "Unknown intersection calculation method.");
+			QMessageBox::critical(m_parent, "Error", "Unknown intersection calculation method.");
 			break;
 	};
 
@@ -364,26 +235,16 @@ void LinesView::UpdateIntersections()
 
 		const t_real width = 14.;
 		QRectF rect{inters[0]-width/2, inters[1]-width/2, width, width};
-		QGraphicsItem *item = m_scene->addEllipse(rect, pen, brush);
+		QGraphicsItem *item = addEllipse(rect, pen, brush);
 		m_elems_inters.push_back(item);
 	}
 }
 
 
-void LinesView::UpdateVoro()
+void LinesScene::UpdateVoro()
 {
 	if(!m_elem_voro)
 		return;
-
-	const int width = m_elem_voro->width();
-	const int height = m_elem_voro->height();
-
-	QProgressDialog progdlg(this);
-	progdlg.setWindowModality(Qt::WindowModal);
-	progdlg.setMinimum(0);
-	progdlg.setMaximum(height);
-	progdlg.setLabel(new QLabel("Calculating Voronoi Regions..."));
-
 
 	unsigned int num_threads = std::thread::hardware_concurrency();
 	if(num_threads > 8)
@@ -393,37 +254,45 @@ void LinesView::UpdateVoro()
 	std::vector<std::shared_ptr<std::packaged_task<void()>>> packages;
 	std::mutex mtx;
 
+	const int width = m_elem_voro->width();
+	const int height = m_elem_voro->height();
 	std::unordered_map<std::size_t, QColor> linecolours;
+
+	QProgressDialog progdlg(m_parent);
+	progdlg.setWindowModality(Qt::WindowModal);
+	progdlg.setMinimum(0);
+	progdlg.setMaximum(height);
+	QString msg = QString("Calculating Voronoi regions in %1 threads...").arg(num_threads);
+	progdlg.setLabel(new QLabel(msg));
 
 	for(int y=0; y<height; ++y)
 	{
 		auto package = std::make_shared<std::packaged_task<void()>>(
-		[this, y, width, &linecolours, &mtx]() -> void
-		{
-			for(int x=0; x<width; ++x)
+			[this, y, width, &linecolours, &mtx]() -> void
 			{
-				t_vec pt = m::create<t_vec>({t_real(x), t_real(y)});
-				std::size_t lineidx = GetClosestLineIdx(pt);
-
-				// get colour for voronoi region
-				QColor col{0xff, 0xff, 0xff, 0xff};
-
-				auto iter = linecolours.find(lineidx);
-				if(iter != linecolours.end())
+				for(int x=0; x<width; ++x)
 				{
-					col = iter->second;
-				}
-				else
-				{
-					col.setRgb(get_rand<int>(0,0xff), get_rand<int>(0,0xff), get_rand<int>(0,0xff));
+					t_vec pt = m::create<t_vec>({t_real(x), t_real(y)});
+					std::size_t lineidx = GetClosestLineIdx(pt);
+
+					// get colour for voronoi region
+					QColor col{0xff, 0xff, 0xff, 0xff};
 
 					std::lock_guard<std::mutex> _lck(mtx);
-					linecolours.insert(std::make_pair(lineidx, col));
-				}
+					auto iter = linecolours.find(lineidx);
+					if(iter != linecolours.end())
+					{
+						col = iter->second;
+					}
+					else
+					{
+						col.setRgb(get_rand<int>(0,0xff), get_rand<int>(0,0xff), get_rand<int>(0,0xff));
+						linecolours.insert(std::make_pair(lineidx, col));
+					}
 
-				m_elem_voro->setPixelColor(x, y, col);
-			}
-		});
+					m_elem_voro->setPixelColor(x, y, col);
+				}
+			});
 
 		packages.push_back(package);
 		asio::post(tp, [package]() -> void { if(package) (*package)(); });
@@ -446,7 +315,7 @@ void LinesView::UpdateVoro()
 }
 
 
-std::size_t LinesView::GetClosestLineIdx(const t_vec& pt) const
+std::size_t LinesScene::GetClosestLineIdx(const t_vec& pt) const
 {
 	t_real mindist = std::numeric_limits<t_real>::max();
 	std::size_t minidx = 0;
@@ -472,8 +341,159 @@ std::size_t LinesView::GetClosestLineIdx(const t_vec& pt) const
 
 // ----------------------------------------------------------------------------
 
+LinesView::LinesView(LinesScene *scene, QWidget *parent) : QGraphicsView(scene, parent),
+	m_scene{scene}
+{
+	setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
+	setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
+
+	setInteractive(true);
+	setMouseTracking(true);
+
+	//scale(1., -1.);
+}
+
+
+LinesView::~LinesView()
+{
+}
+
+
+void LinesView::resizeEvent(QResizeEvent *evt)
+{
+	QPointF pt1{mapToScene(QPoint{0,0})};
+	QPointF pt2{mapToScene(QPoint{evt->size().width(), evt->size().height()})};
+
+	const double padding = 16;
+
+	// include bounds given by vertices
+	for(const Vertex* vertex : m_scene->GetVertexElems())
+	{
+		QPointF vertexpos = vertex->scenePos();
+
+		if(vertexpos.x() < pt1.x())
+			pt1.setX(vertexpos.x() -  padding);
+		if(vertexpos.x() > pt2.x())
+			pt2.setX(vertexpos.x() +  padding);
+		if(vertexpos.y() < pt1.y())
+			pt1.setY(vertexpos.y() -  padding);
+		if(vertexpos.y() > pt2.y())
+			pt2.setY(vertexpos.y() +  padding);
+	}
+
+	m_scene->CreateVoroImage(evt->size().width(), evt->size().height());
+	setSceneRect(QRectF{pt1, pt2});
+}
+
+
+
+void LinesView::mousePressEvent(QMouseEvent *evt)
+{
+	QPoint posVP = evt->pos();
+	QPointF posScene = mapToScene(posVP);
+
+	QList<QGraphicsItem*> items = this->items(posVP);
+	QGraphicsItem* item = nullptr;
+	bool item_is_vertex = false;
+	auto &verts = m_scene->GetVertexElems();
+
+	for(int itemidx=0; itemidx<items.size(); ++itemidx)
+	{
+		item = items[itemidx];
+		auto iter = std::find(verts.begin(), verts.end(), static_cast<Vertex*>(item));
+		item_is_vertex = (iter != verts.end());
+		if(item_is_vertex)
+			break;
+	}
+
+	// only select vertices
+	if(!item_is_vertex)
+		item = nullptr;
+
+
+	if(evt->button() == Qt::LeftButton)
+	{
+		// if no vertex is at this position, create a new one
+		if(!item)
+		{
+			m_scene->AddVertex(posScene);
+			m_dragging = true;
+			m_scene->UpdateAll();
+		}
+
+		else
+		{
+			// vertex is being dragged
+			if(item_is_vertex)
+			{
+				m_dragging = true;
+			}
+		}
+	}
+	else if(evt->button() == Qt::RightButton)
+	{
+		// if a vertex is at this position, remove it
+		if(item && item_is_vertex)
+		{
+			m_scene->removeItem(item);
+			auto iter = std::find(verts.begin(), verts.end(), static_cast<Vertex*>(item));
+
+			std::size_t idx = iter - verts.begin();
+			if(iter != verts.end())
+				iter = verts.erase(iter);
+			delete item;
+
+			// move remaining vertex of line to the end
+			std::size_t otheridx = (idx % 2 == 0 ? idx : idx-1);
+			if(otheridx < verts.size())
+			{
+				Vertex* vert = verts[otheridx];
+				verts.erase(verts.begin()+otheridx);
+				verts.push_back(vert);
+			}
+
+			m_scene->UpdateAll();
+		}
+	}
+
+	QGraphicsView::mousePressEvent(evt);
+}
+
+
+void LinesView::mouseReleaseEvent(QMouseEvent *evt)
+{
+	if(evt->button() == Qt::LeftButton)
+		m_dragging = false;
+
+	m_scene->UpdateAll();
+	QGraphicsView::mouseReleaseEvent(evt);
+}
+
+
+void LinesView::mouseMoveEvent(QMouseEvent *evt)
+{
+	QGraphicsView::mouseMoveEvent(evt);
+
+	if(m_dragging)
+	{
+		QResizeEvent evt{size(), size()};
+		resizeEvent(&evt);
+		m_scene->UpdateAll();
+	}
+
+	QPoint posVP = evt->pos();
+	QPointF posScene = mapToScene(posVP);
+	emit SignalMouseCoordinates(posScene.x(), posScene.y());
+}
+
+// ----------------------------------------------------------------------------
+
+
+
+// ----------------------------------------------------------------------------
+
 LinesWnd::LinesWnd(QWidget* pParent) : QMainWindow{pParent},
-	m_scene{new QGraphicsScene{this}},
+	m_scene{new LinesScene{this}},
 	m_view{new LinesView{m_scene.get(), this}},
 	m_statusLabel{std::make_shared<QLabel>(this)}
 {
@@ -511,7 +531,7 @@ LinesWnd::LinesWnd(QWidget* pParent) : QMainWindow{pParent},
 	// menu actions
 	QAction *actionNew = new QAction{"New", this};
 	connect(actionNew, &QAction::triggered, [this]()
-		{ m_view->ClearVertices(); });
+		{ m_scene->ClearVertices(); });
 
 	QAction *actionLoad = new QAction{"Load...", this};
 	connect(actionLoad, &QAction::triggered, [this]()
@@ -526,7 +546,7 @@ LinesWnd::LinesWnd(QWidget* pParent) : QMainWindow{pParent},
 				return;
 			}
 
-			m_view->ClearVertices();
+			m_scene->ClearVertices();
 
 			ptree::ptree prop{};
 			ptree::read_xml(ifstr, prop);
@@ -547,13 +567,13 @@ LinesWnd::LinesWnd(QWidget* pParent) : QMainWindow{pParent},
 				if(!vertx || !verty)
 					break;
 
-				m_view->AddVertex(QPointF{*vertx, *verty});
+				m_scene->AddVertex(QPointF{*vertx, *verty});
 
 				++vertidx;
 			}
 
 			if(vertidx > 0)
-				m_view->UpdateAll();
+				m_scene->UpdateAll();
 			else
 				QMessageBox::warning(this, "Warning", "File contains no data.");
 		}
@@ -575,7 +595,7 @@ LinesWnd::LinesWnd(QWidget* pParent) : QMainWindow{pParent},
 			ptree::ptree prop{};
 
 			std::size_t vertidx = 0;
-			for(const Vertex* vertex : m_view->GetVertexElems())
+			for(const Vertex* vertex : m_scene->GetVertexElems())
 			{
 				QPointF vertexpos = vertex->scenePos();
 
@@ -615,7 +635,7 @@ LinesWnd::LinesWnd(QWidget* pParent) : QMainWindow{pParent},
 	QAction *actionVoro = new QAction{"Voronoi Regions", this};
 	connect(actionVoro, &QAction::triggered, [this]()
 	{
-		m_view->UpdateVoro();
+		m_scene->UpdateVoro();
 	});
 
 
@@ -623,13 +643,13 @@ LinesWnd::LinesWnd(QWidget* pParent) : QMainWindow{pParent},
 	actionIntersDirect->setCheckable(true);
 	actionIntersDirect->setChecked(false);
 	connect(actionIntersDirect, &QAction::toggled, [this]()
-	{ m_view->SetIntersectionCalculationMethod(IntersectionCalculationMethod::DIRECT); });
+	{ m_scene->SetIntersectionCalculationMethod(IntersectionCalculationMethod::DIRECT); });
 
 	QAction *actionIntersSweep = new QAction{"Sweep", this};
 	actionIntersSweep->setCheckable(true);
 	actionIntersSweep->setChecked(true);
 	connect(actionIntersSweep, &QAction::toggled, [this]()
-	{ m_view->SetIntersectionCalculationMethod(IntersectionCalculationMethod::SWEEP); });
+	{ m_scene->SetIntersectionCalculationMethod(IntersectionCalculationMethod::SWEEP); });
 
 
 	QActionGroup *groupInters = new QActionGroup{this};
