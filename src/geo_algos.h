@@ -32,6 +32,9 @@
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/kruskal_min_spanning_tree.hpp>
 
+#include <boost/geometry.hpp>
+#include <boost/geometry/index/rtree.hpp>
+
 #include <libqhullcpp/Qhull.h>
 #include <libqhullcpp/QhullFacet.h>
 #include <libqhullcpp/QhullRidge.h>
@@ -2163,26 +2166,6 @@ requires m::is_iterable<t_arr> && m::is_basic_vec<t_arr>
 
 
 
-template<class t_hook, class T>
-struct ClosestPairTreeLeaf
-{
-	const T* vec = nullptr;
-	t_hook _h{};
-
-	friend std::ostream& operator<<(std::ostream& ostr, const ClosestPairTreeLeaf<t_hook, T>& e)
-	{
-		ostr << *e.vec;
-		return ostr;
-	}
-
-	friend bool operator<(const ClosestPairTreeLeaf<t_hook, T>& e1, const ClosestPairTreeLeaf<t_hook, T>& e2)
-	{
-		// compare by y
-		return (*e1.vec)[1] < (*e2.vec)[1];
-	}
-};
-
-
 template<class t_vec, class t_real = typename t_vec::value_type>
 std::tuple<const t_vec*, const t_vec*, t_real>
 closest_pair_ineff(const std::vector<t_vec>& points)
@@ -2208,6 +2191,26 @@ requires m::is_vec<t_vec>
 
 	return std::make_tuple(pt1, pt2, dist);
 }
+
+
+template<class t_hook, class T>
+struct ClosestPairTreeLeaf
+{
+	const T* vec = nullptr;
+	t_hook _h{};
+
+	friend std::ostream& operator<<(std::ostream& ostr, const ClosestPairTreeLeaf<t_hook, T>& e)
+	{
+		ostr << *e.vec;
+		return ostr;
+	}
+
+	friend bool operator<(const ClosestPairTreeLeaf<t_hook, T>& e1, const ClosestPairTreeLeaf<t_hook, T>& e2)
+	{
+		// compare by y
+		return (*e1.vec)[1] < (*e2.vec)[1];
+	}
+};
 
 
 /**
@@ -2270,7 +2273,7 @@ requires m::is_vec<t_vec>
 			t_vec vec1 = *iter2->vec; vec1[1] -= dist;
 			t_vec vec2 = *iter2->vec; vec2[1] += dist;
 			auto [iterrange1, iterrange2] =
-			status.bounded_range(t_leaf{.vec=&vec1}, t_leaf{.vec=&vec2}, 1, 1);
+				status.bounded_range(t_leaf{.vec=&vec1}, t_leaf{.vec=&vec2}, 1, 1);
 
 			for(auto iter=iterrange1; iter!=iterrange2; std::advance(iter,1))
 			{
@@ -2290,6 +2293,92 @@ requires m::is_vec<t_vec>
 	}
 
 	return std::make_tuple(*leaf1->vec, *leaf2->vec, dist);
+}
+
+
+template<class t_vertex, class t_vec, std::size_t ...indices>
+constexpr void _geo_vertex_assign(t_vertex& vert, const t_vec& vec, const std::index_sequence<indices...>&)
+{
+	namespace geo = boost::geometry;
+	(geo::set<indices>(vert, vec[indices]), ...);
+}
+
+
+/**
+ * closest pair (r-tree)
+ */
+template<std::size_t dim, class t_vec, class t_real = typename t_vec::value_type>
+std::tuple<t_vec, t_vec, t_real>
+closest_pair_rtree(const std::vector<t_vec>& _points)
+requires m::is_vec<t_vec>
+{
+	std::vector<t_vec> points = _points;
+	std::stable_sort(points.begin(), points.end(),
+	[](const t_vec& pt1, const t_vec& pt2) -> bool
+	{
+		// sort by x
+		return pt1[0] <= pt2[0];
+	});
+
+
+	namespace geo = boost::geometry;
+	namespace geoidx = geo::index;
+
+	using t_vertex = geo::model::point<t_real, dim, geo::cs::cartesian>;
+	using t_box = geo::model::box<t_vertex>;
+	using t_rtree_leaf = std::tuple<t_vertex, std::size_t>;
+	using t_rtree = geoidx::rtree<t_rtree_leaf, geoidx::dynamic_rstar>;
+
+	t_rtree rt(typename t_rtree::parameters_type(points.size()));
+	for(std::size_t ptidx=0; ptidx<points.size(); ++ptidx)
+	{
+		t_vertex vert;
+		_geo_vertex_assign<t_vertex, t_vec>(vert, points[ptidx], std::make_index_sequence<dim>());
+
+		rt.insert(std::make_tuple(vert, ptidx));
+	}
+
+
+	std::size_t idx1 = 0;
+	std::size_t idx2 = 1;
+	t_vec query1 = m::create<t_vec>(dim);
+	t_vec query2 = m::create<t_vec>(dim);
+
+	t_real dist = m::norm<t_vec>(points[idx2] - points[idx1]);
+	for(std::size_t ptidx=1; ptidx<points.size(); ++ptidx)
+	{
+		query1[0] = points[ptidx][0] - dist;
+		query2[0] = points[ptidx][0];
+
+		for(std::size_t i=1; i<dim; ++i)
+		{
+			query1[i] = points[ptidx][i] - dist;
+			query2[i] = points[ptidx][i] + dist;
+		}
+
+		t_vertex vert1, vert2;
+		_geo_vertex_assign<t_vertex, t_vec>(vert1, query1, std::make_index_sequence<dim>());
+		_geo_vertex_assign<t_vertex, t_vec>(vert2, query2, std::make_index_sequence<dim>());
+
+		t_box query_obj(vert1, vert2);
+
+		std::vector<t_rtree_leaf> query_answer;
+		rt.query(geoidx::within(query_obj), std::back_inserter(query_answer));
+
+		for(const auto& answ : query_answer)
+		{
+			std::size_t answidx = std::get<1>(answ);
+			t_real newdist = m::norm<t_vec>(points[answidx] - points[ptidx]);
+			if(newdist < dist)
+			{
+				dist = newdist;
+				idx1 = answidx;
+				idx2 = ptidx;
+			}
+		}
+	}
+
+	return std::make_tuple(points[idx1], points[idx2], dist);
 }
 
 
