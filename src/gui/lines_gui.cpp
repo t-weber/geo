@@ -100,9 +100,18 @@ LinesScene::~LinesScene()
 
 void LinesScene::CreateVoroImage(int width, int height)
 {
-	if(m_elem_voro)
+	// only delete old image and create a new one if the sizes have changed
+	if(m_elem_voro && m_elem_voro->width()!=width && m_elem_voro->height()!=height)
+	{
 		delete m_elem_voro;
-	m_elem_voro = new QImage(width, height, QImage::Format_RGB32);
+		m_elem_voro = nullptr;
+	}
+
+	if(!m_elem_voro)
+	{
+		m_elem_voro = new QImage(width, height, QImage::Format_RGB32);
+		m_elem_voro->fill(/*backgroundBrush().color()*/ QColor::fromRgbF(0.95, 0.95, 0.95, 1.));
+	}
 }
 
 
@@ -124,6 +133,8 @@ void LinesScene::ClearVertices()
 	m_elems_vertices.clear();
 
 	setBackgroundBrush(QBrush{QColor::fromRgbF(0.95, 0.95, 0.95, 1.)});
+	if(m_elem_voro)
+		m_elem_voro->fill(backgroundBrush().color());
 	UpdateAll();
 }
 
@@ -241,8 +252,10 @@ void LinesScene::UpdateIntersections()
 }
 
 
-void LinesScene::UpdateVoro()
+void LinesScene::UpdateVoro(const QTransform& trafoSceneToVP)
 {
+	QTransform trafoVPToScene = trafoSceneToVP.inverted();
+
 	if(!m_elem_voro)
 		return;
 
@@ -268,11 +281,14 @@ void LinesScene::UpdateVoro()
 	for(int y=0; y<height; ++y)
 	{
 		auto package = std::make_shared<std::packaged_task<void()>>(
-			[this, y, width, &linecolours, &mtx]() -> void
+			[this, y, width, &linecolours, &mtx, &trafoVPToScene]() -> void
 			{
 				for(int x=0; x<width; ++x)
 				{
-					t_vec pt = m::create<t_vec>({t_real(x), t_real(y)});
+					t_real scenex, sceney;
+					trafoVPToScene.map(x, y, &scenex, &sceney);
+
+					t_vec pt = m::create<t_vec>({scenex, sceney});
 					std::size_t lineidx = GetClosestLineIdx(pt);
 
 					// get colour for voronoi region
@@ -361,28 +377,30 @@ LinesView::~LinesView()
 
 void LinesView::resizeEvent(QResizeEvent *evt)
 {
-	QPointF pt1{mapToScene(QPoint{0,0})};
-	QPointF pt2{mapToScene(QPoint{evt->size().width(), evt->size().height()})};
+	int widthView = evt->size().width();
+	int heightView = evt->size().height();
 
-	const double padding = 16;
+	QPointF pt1{mapToScene(QPoint{0,0})};
+	QPointF pt2{mapToScene(QPoint{widthView, heightView})};
 
 	// include bounds given by vertices
+	const double padding = 16;
 	for(const Vertex* vertex : m_scene->GetVertexElems())
 	{
 		QPointF vertexpos = vertex->scenePos();
 
 		if(vertexpos.x() < pt1.x())
-			pt1.setX(vertexpos.x() -  padding);
+			pt1.setX(vertexpos.x() - padding);
 		if(vertexpos.x() > pt2.x())
-			pt2.setX(vertexpos.x() +  padding);
+			pt2.setX(vertexpos.x() + padding);
 		if(vertexpos.y() < pt1.y())
-			pt1.setY(vertexpos.y() -  padding);
+			pt1.setY(vertexpos.y() - padding);
 		if(vertexpos.y() > pt2.y())
-			pt2.setY(vertexpos.y() +  padding);
+			pt2.setY(vertexpos.y() + padding);
 	}
-
-	m_scene->CreateVoroImage(evt->size().width(), evt->size().height());
 	setSceneRect(QRectF{pt1, pt2});
+
+	m_scene->CreateVoroImage(widthView, heightView);
 }
 
 
@@ -483,9 +501,22 @@ void LinesView::mouseMoveEvent(QMouseEvent *evt)
 
 	QPoint posVP = evt->pos();
 	QPointF posScene = mapToScene(posVP);
-	emit SignalMouseCoordinates(posScene.x(), posScene.y());
+	emit SignalMouseCoordinates(posScene.x(), posScene.y(), posVP.x(), posVP.y());
 }
 
+
+void LinesView::drawBackground(QPainter* painter, const QRectF& rect)
+{
+	//QGraphicsView::drawBackground(painter, rect.intersected(sceneRect()));
+	//QGraphicsView::drawBackground(painter, rect);
+
+	// hack, because the background brush is drawn with respect to scene (0,0), not vp (0,0)
+	// TODO: handle scene-viewport trafos other than translations
+	if(m_scene->GetVoroImage())
+		painter->drawImage(mapToScene(QPoint(0,0)), *m_scene->GetVoroImage()/*, mapFromScene(rect)*/);
+	else
+		QGraphicsView::drawBackground(painter, rect);
+}
 // ----------------------------------------------------------------------------
 
 
@@ -531,7 +562,7 @@ LinesWnd::LinesWnd(QWidget* pParent) : QMainWindow{pParent},
 	// menu actions
 	QAction *actionNew = new QAction{"New", this};
 	connect(actionNew, &QAction::triggered, [this]()
-		{ m_scene->ClearVertices(); });
+	{ m_scene->ClearVertices(); });
 
 	QAction *actionLoad = new QAction{"Load...", this};
 	connect(actionLoad, &QAction::triggered, [this]()
@@ -635,7 +666,7 @@ LinesWnd::LinesWnd(QWidget* pParent) : QMainWindow{pParent},
 	QAction *actionVoro = new QAction{"Voronoi Regions", this};
 	connect(actionVoro, &QAction::triggered, [this]()
 	{
-		m_scene->UpdateVoro();
+		m_scene->UpdateVoro(m_view->viewportTransform());
 	});
 
 
@@ -687,9 +718,11 @@ LinesWnd::LinesWnd(QWidget* pParent) : QMainWindow{pParent},
 
 
 	// connections
-	connect(m_view.get(), &LinesView::SignalMouseCoordinates, [this](double x, double y) -> void
+	connect(m_view.get(), &LinesView::SignalMouseCoordinates,
+	[this](double x, double y, double vpx, double vpy) -> void
 	{
-		SetStatusMessage(QString("x=%1, y=%2.").arg(x, 5).arg(y, 5));
+		SetStatusMessage(QString("Scene: x=%1, y=%2, Viewport: x=%3, y=%4.")
+			.arg(x, 5).arg(y, 5).arg(vpx, 5).arg(vpy, 5));
 	});
 
 

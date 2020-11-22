@@ -74,7 +74,8 @@ public:
 	void SetIntersectionCalculationMethod(IntersectionCalculationMethod m);
 
 	void CreateVoroImage(int width, int height);
-	void UpdateVoro();
+	void UpdateVoro(const QTransform& trafoSceneToVP);
+	const QImage* GetVoroImage() const { return m_elem_voro; }
 
 private:
 	QWidget *m_parent = nullptr;
@@ -112,8 +113,11 @@ private:
 	LinesScene *m_scene = nullptr;
 	bool m_dragging = false;
 
+protected:
+	virtual void drawBackground(QPainter*, const QRectF&) override;
+
 signals:
-	void SignalMouseCoordinates(double x, double y);
+	void SignalMouseCoordinates(double scenex, double sceney, double vpx, double vpy);
 };
 
 
