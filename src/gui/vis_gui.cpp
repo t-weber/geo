@@ -296,6 +296,7 @@ void VisView::UpdateKer()
 		verts_reversed.push_back(*iter);
 
 	//auto kerpoly = calc_ker<t_vec>(m_vertices, g_eps);
+	//auto kerpoly_reversed = calc_ker<t_vec>(verts_reversed, g_eps);
 	auto kerpoly = calc_ker_ineff<t_vec>(m_vertices, g_eps);
 	auto kerpoly_reversed = calc_ker_ineff<t_vec>(verts_reversed, g_eps);
 
@@ -387,8 +388,7 @@ VisWnd::VisWnd(QWidget* pParent) : QMainWindow{pParent},
 
 	// menu actions
 	QAction *actionNew = new QAction{"New", this};
-	connect(actionNew, &QAction::triggered, [this]()
-		{ m_view->ClearVertices(); });
+	connect(actionNew, &QAction::triggered, [this]() { m_view->ClearVertices(); });
 
 	QAction *actionLoad = new QAction{"Load...", this};
 	connect(actionLoad, &QAction::triggered, [this]()
@@ -493,8 +493,7 @@ VisWnd::VisWnd(QWidget* pParent) : QMainWindow{pParent},
 	QAction *actionSort = new QAction{"Sort Vertices", this};
 	actionSort->setCheckable(true);
 	actionSort->setChecked(m_view->GetSortVertices());
-	connect(actionSort, &QAction::toggled, [this](bool b)
-		{ m_view->SetSortVertices(b); });
+	connect(actionSort, &QAction::toggled, [this](bool b) { m_view->SetSortVertices(b); });
 
 
 	// menu

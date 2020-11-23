@@ -1716,10 +1716,24 @@ requires m::is_vec<t_vec>
 		return std::vector<t_vec>({});
 
 	using t_edgeidx = std::pair<std::size_t, std::size_t>;
+
+
+	for(std::size_t vertidx=0; vertidx<verts.size(); ++vertidx)
+	{
+		std::size_t vertidxNext = (vertidx+1) % verts.size();
+		const t_vec& vert1 = verts[vertidx];
+		const t_vec& vert2 = verts[vertidxNext];
+
+		t_real angle = line_angle<t_vec>(vert1, vert2);
+	}
+
+
+	// TODO
+
+
 	std::vector<t_edgeidx> edgesFwd{{std::make_pair(0,1)}};
 	std::vector<t_edgeidx> edgesBwd{{std::make_pair(verts.size()-1, verts.size()-2)}};
 
-	// TODO
 	for(std::size_t vertidx=1; vertidx<verts.size(); ++vertidx)
 	{
 		std::size_t vertidxNext = (vertidx+1) % verts.size();
@@ -2379,6 +2393,30 @@ requires m::is_vec<t_vec>
 	}
 
 	return std::make_tuple(points[idx1], points[idx2], dist);
+}
+
+
+
+// ----------------------------------------------------------------------------
+
+
+
+/**
+ * geometric series
+ * see: https://en.wikipedia.org/wiki/Geometric_series
+ */
+template<class t_real = double>
+t_real geo_series(t_real x, std::size_t n)
+{
+	/*t_real sum = 0.;
+	for(std::size_t i=0; i<n+1; ++i)
+		sum += std::pow(x, t_real(i));
+	std::cout << "sum: " << sum << std::endl;*/
+
+	if(m::equals<t_real>(x, 1))
+		return t_real(n+1) * x;
+	else
+		return (t_real(1) - std::pow(x, t_real(n+1))) / (t_real(1) - x);
 }
 
 
