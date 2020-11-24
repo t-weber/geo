@@ -14,7 +14,7 @@
 #include "../src/geo_algos.h"
 
 
-using t_real = double;
+using t_real = /*long*/ double;
 using t_vec = m::vec<t_real, std::vector>;
 using t_mat = m::mat<t_real, std::vector>;
 

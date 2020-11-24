@@ -18,13 +18,14 @@
 #include <limits>
 #include <algorithm>
 #include <numeric>
+#include <numbers>
 //#include <iostream>
 
 
 namespace m {
 
-template<typename T> constexpr T pi = T(M_PI);
-template<typename T> T golden = T(0.5) + std::sqrt(T(5))/T(2);
+template<typename T> constexpr T pi = std::numbers::pi_v<T>;
+template<typename T> T golden = std::numbers::phi_v<T>; //T(0.5) + std::sqrt(T(5))/T(2);
 
 
 // ----------------------------------------------------------------------------
@@ -41,6 +42,21 @@ requires is_scalar<T>
 	return std::abs(t1 - t2) <= eps;
 }
 
+
+/**
+ * mod operation, keeping result positive
+ */
+template<class t_real>
+t_real mod_pos(t_real val, t_real tomod=t_real{2}*pi<t_real>)
+requires is_scalar<t_real>
+{
+	val = std::fmod(val, tomod);
+	if(val < t_real(0))
+		val += tomod;
+
+	return val;
+}
+
 /**
  * are two angles equal within an epsilon range?
  */
@@ -48,13 +64,12 @@ template<class T>
 bool angle_equals(T t1, T t2, T eps = std::numeric_limits<T>::epsilon(), T tomod=T{2}*pi<T>)
 requires is_scalar<T>
 {
-	t1 = std::fmod(t1, tomod);
-	if(t1 < 0) t1+=tomod;
-	t2 = std::fmod(t2, tomod);
-	if(t2 < 0) t2+=tomod;
+	t1 = mod_pos<T>(t1, tomod);
+	t2 = mod_pos<T>(t2, tomod);
 
 	return std::abs(t1 - t2) <= eps;
 }
+
 
 /**
  * are two complex numbers equal within an epsilon range?

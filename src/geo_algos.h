@@ -44,6 +44,8 @@
 
 
 // ----------------------------------------------------------------------------
+// helper functions
+// ----------------------------------------------------------------------------
 
 template<class t_num>
 t_num get_rand(t_num min=1, t_num max=-1)
@@ -395,9 +397,13 @@ requires m::is_vec<t_vec>
 
 	return std::make_tuple(verts, mean);
 }
+
 // ----------------------------------------------------------------------------
 
 
+
+// ----------------------------------------------------------------------------
+// convex hull
 // ----------------------------------------------------------------------------
 
 template<class t_vec, class t_real = typename t_vec::value_type>
@@ -874,9 +880,13 @@ requires m::is_vec<t_vec>
 	return verts;
 }
 
-
 // ----------------------------------------------------------------------------
 
+
+
+// ----------------------------------------------------------------------------
+// delaunay triangulation
+// ----------------------------------------------------------------------------
 
 /**
  * delaunay triangulation and voronoi vertices
@@ -1319,15 +1329,12 @@ requires m::is_vec<t_vec>
 
 
 
-// ----------------------------------------------------------------------------
-
-
 /**
  * get all edges from a delaunay triangulation
  */
 template<class t_vec,
-	class t_edge = std::pair<std::size_t, std::size_t>,
-	class t_real = typename t_vec::value_type>
+class t_edge = std::pair<std::size_t, std::size_t>,
+class t_real = typename t_vec::value_type>
 std::vector<t_edge>
 get_edges(const std::vector<t_vec>& verts, const std::vector<std::vector<t_vec>>& triags, t_real eps)
 {
@@ -1376,6 +1383,13 @@ get_edges(const std::vector<t_vec>& verts, const std::vector<std::vector<t_vec>>
 	return edges;
 }
 
+// ----------------------------------------------------------------------------
+
+
+
+// ----------------------------------------------------------------------------
+// spanning tree
+// ----------------------------------------------------------------------------
 
 /**
  * finds loops in an undirected graph
@@ -1518,11 +1532,13 @@ requires m::is_vec<t_vec>
 	return span;
 }
 
-
-
 // ----------------------------------------------------------------------------
 
 
+
+// ----------------------------------------------------------------------------
+// kernel
+// ----------------------------------------------------------------------------
 
 template<class t_vec, class t_real = typename t_vec::value_type>
 std::pair<bool, t_vec> get_inters_dual(const t_vec& vert1, const t_vec& vert2)
@@ -1782,9 +1798,13 @@ requires m::is_vec<t_vec>
 }
 
 
-
 // ----------------------------------------------------------------------------
 
+
+
+// ----------------------------------------------------------------------------
+// line segment intersections
+// ----------------------------------------------------------------------------
 
 template<class t_vec, class t_line = std::pair<t_vec, t_vec>>
 std::vector<std::tuple<std::size_t, std::size_t, t_vec>>
@@ -1847,11 +1867,70 @@ struct IntersTreeLeaf
 };
 
 
+/**
+ * SO(2) rotation matrix
+ */
+template<class t_mat, class t_vec>
+t_mat rotation_2d(const typename t_vec::value_type angle)
+requires m::is_vec<t_vec> && m::is_mat<t_mat>
+{
+	using t_real = typename t_vec::value_type;
+
+	const t_real c = std::cos(angle);
+	const t_real s = std::sin(angle);
+
+	return m::create<t_mat>({{c,s}, {-s,c}});
+}
+
+
 template<class t_vec, class t_line = std::pair<t_vec, t_vec>, class t_real = typename t_vec::value_type>
 std::vector<std::tuple<std::size_t, std::size_t, t_vec>>
-intersect_sweep(const std::vector<t_line>& lines, t_real eps = 1e-6)
+intersect_sweep(const std::vector<t_line>& _lines, t_real eps = 1e-6)
 requires m::is_vec<t_vec>
 {
+	using t_mat = m::mat<t_real, std::vector>;
+
+	// look for vertical lines
+	bool has_vert_line = 0;
+	t_real min_angle_to_y{std::numeric_limits<t_real>::max()};
+	std::vector<t_line> lines = _lines;
+
+	for(const t_line& line : lines)
+	{
+		if(m::equals<t_real>(line.first[0], line.second[0], eps))
+		{
+			has_vert_line = 1;
+		}
+		else
+		{
+			// get angles relative to y axis
+			t_real angle_to_y = line_angle<t_vec>(line.first, line.second) + m::pi<t_real>/t_real(2);
+			angle_to_y = m::mod_pos<t_real>(angle_to_y, t_real(2)*m::pi<t_real>);
+			if(angle_to_y > m::pi<t_real>/t_real(2))
+				angle_to_y -= m::pi<t_real>;
+
+			if(std::abs(angle_to_y) < std::abs(min_angle_to_y))
+				min_angle_to_y = angle_to_y;
+		}
+	}
+
+	//if(has_vert_line)
+	//	std::cout << "vertical line; next lowest angle: " << min_angle_to_y/m::pi<t_real>*180. << std::endl;
+
+	// rotate all lines
+	std::optional<t_mat> rotmat;
+	if(has_vert_line)
+	{
+		rotmat = rotation_2d<t_mat, t_vec>(-min_angle_to_y * t_real(0.5));
+
+		for(t_line& line : lines)
+		{
+			line.first = *rotmat * line.first;
+			line.second = *rotmat * line.second;
+		}
+	}
+
+
 	enum class SweepEventType { LEFT_VERTEX, RIGHT_VERTEX, INTERSECTION };
 
 	struct SweepEvent
@@ -1902,7 +1981,10 @@ requires m::is_vec<t_vec>
 
 
 	// events
-	auto events_comp = [](const SweepEvent& evt1, const SweepEvent& evt2) -> bool { return evt1.x > evt2.x; };
+	auto events_comp = [](const SweepEvent& evt1, const SweepEvent& evt2) -> bool
+	{
+		return evt1.x > evt2.x;
+	};
 
 	std::priority_queue<SweepEvent, std::vector<SweepEvent>, decltype(events_comp)> events(events_comp);
 
@@ -1911,10 +1993,21 @@ requires m::is_vec<t_vec>
 		const t_line& line = lines[line_idx];
 
 		SweepEvent evtLeft{.x = std::get<0>(line)[0], .ty=SweepEventType::LEFT_VERTEX, .line_idx=line_idx};
-		events.emplace(std::move(evtLeft));
-
 		SweepEvent evtRight{.x = std::get<1>(line)[0], .ty=SweepEventType::RIGHT_VERTEX, .line_idx=line_idx};
-		events.emplace(std::move(evtRight));
+
+		// wrong order of vertices?
+		if(evtLeft.x > evtRight.x)
+		{
+			std::swap(evtLeft.ty, evtRight.ty);
+
+			events.emplace(std::move(evtRight));
+			events.emplace(std::move(evtLeft));
+		}
+		else
+		{
+			events.emplace(std::move(evtLeft));
+			events.emplace(std::move(evtRight));
+		}
 	}
 
 
@@ -2096,13 +2189,26 @@ requires m::is_vec<t_vec>
 		}
 	}
 
+
+	// rotate intersection points back
+	if(rotmat)
+	{
+		*rotmat = m::trans<t_mat>(*rotmat);
+
+		for(auto& inters : intersections)
+			std::get<2>(inters) = *rotmat * std::get<2>(inters);
+	}
+
 	return intersections;
 }
+
+// ----------------------------------------------------------------------------
 
 
 
 // ----------------------------------------------------------------------------
-
+// subvector
+// ----------------------------------------------------------------------------
 
 /**
  * maximum subvector
@@ -2174,10 +2280,13 @@ requires m::is_iterable<t_arr> && m::is_basic_vec<t_arr>
 	return std::make_tuple(start_idx, end_idx, val);
 }
 
+// ----------------------------------------------------------------------------
+
 
 
 // ----------------------------------------------------------------------------
-
+// closest pair
+// ----------------------------------------------------------------------------
 
 
 template<class t_vec, class t_real = typename t_vec::value_type>
@@ -2396,9 +2505,13 @@ requires m::is_vec<t_vec>
 }
 
 
-
 // ----------------------------------------------------------------------------
 
+
+
+// ----------------------------------------------------------------------------
+// misc
+// ----------------------------------------------------------------------------
 
 
 /**
