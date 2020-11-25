@@ -1,5 +1,5 @@
 /**
- * @author Tobias Weber
+ * @author Tobias Weber (orcid: 0000-0002-7230-1932)
  * @date may-2020
  * @license: see 'LICENSE' file
  */
@@ -13,7 +13,6 @@
 #include <QPaintEvent>
 #include <QResizeEvent>
 #include <QMouseEvent>
-
 #include <QVector2D>
 
 #include <memory>

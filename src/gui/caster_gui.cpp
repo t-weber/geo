@@ -1,5 +1,5 @@
 /**
- * @author Tobias Weber
+ * @author Tobias Weber (orcid: 0000-0002-7230-1932)
  * @date May-2020
  * @license: see 'LICENSE' file
  */
@@ -21,19 +21,49 @@ Widget::Widget(QWidget *pParent)
 {
 	{
 		t_poly poly;
-		poly.outer().push_back(t_vertex{-0.25, -0.25});
-		poly.outer().push_back(t_vertex{0.25, -0.25});
-		poly.outer().push_back(t_vertex{0.25, 0.25});
-		poly.outer().push_back(t_vertex{-0.25, 0.25});
+		poly.outer().push_back(t_vertex{-0.4, -0.4});
+		poly.outer().push_back(t_vertex{0.5, -0.4});
+		poly.outer().push_back(t_vertex{0.5, 0.1});
+		poly.outer().push_back(t_vertex{0.25, 0.1});
+		poly.outer().push_back(t_vertex{0.25, 0.1});
+		poly.outer().push_back(t_vertex{0.25, 0.4});
+		poly.outer().push_back(t_vertex{-0.4, 0.4});
 		m_geo.emplace_back(std::move(poly));
 	}
 
 	{
 		t_poly poly;
-		poly.outer().push_back(t_vertex{-0.02, -0.02});
-		poly.outer().push_back(t_vertex{0.02, -0.02});
-		poly.outer().push_back(t_vertex{0.02, 0.02});
-		poly.outer().push_back(t_vertex{-0.02, 0.02});
+		poly.outer().push_back(t_vertex{-0.02+0.15, -0.02});
+		poly.outer().push_back(t_vertex{0.02+0.15, -0.02});
+		poly.outer().push_back(t_vertex{0.02+0.15, 0.02});
+		poly.outer().push_back(t_vertex{-0.02+0.15, 0.02});
+		m_geo.emplace_back(std::move(poly));
+	}
+
+	{
+		t_poly poly;
+		poly.outer().push_back(t_vertex{-0.02+0.15, -0.02+0.15});
+		poly.outer().push_back(t_vertex{0.02+0.15, -0.02+0.15});
+		poly.outer().push_back(t_vertex{0.02+0.15, 0.02+0.15});
+		poly.outer().push_back(t_vertex{-0.02+0.15, 0.02+0.15});
+		m_geo.emplace_back(std::move(poly));
+	}
+
+	{
+		t_poly poly;
+		poly.outer().push_back(t_vertex{-0.02+0.15, -0.02-0.15});
+		poly.outer().push_back(t_vertex{0.02+0.15, -0.02-0.15});
+		poly.outer().push_back(t_vertex{0.02+0.15, 0.02-0.15});
+		poly.outer().push_back(t_vertex{-0.02+0.15, 0.02-0.15});
+		m_geo.emplace_back(std::move(poly));
+	}
+
+	{
+		t_poly poly;
+		poly.outer().push_back(t_vertex{-0.05-0.2, -0.05});
+		poly.outer().push_back(t_vertex{0.05-0.2, -0.05});
+		poly.outer().push_back(t_vertex{0.05-0.2, 0.05});
+		poly.outer().push_back(t_vertex{-0.05-0.2, 0.05});
 		m_geo.emplace_back(std::move(poly));
 	}
 

@@ -861,7 +861,7 @@ HullWnd::HullWnd(QWidget* pParent) : QMainWindow{pParent},
 	connect(actionSpanKruskal, &QAction::toggled, [this]()
 		{ m_scene->SetSpanCalculationMethod(SpanCalculationMethod::KRUSKAL); });
 
-	QAction *actionSpanBoost = new QAction{"Boost.Graph", this};
+	QAction *actionSpanBoost = new QAction{"Kruskal via Boost.Graph", this};
 	actionSpanBoost->setCheckable(true);
 	connect(actionSpanBoost, &QAction::toggled, [this]()
 		{ m_scene->SetSpanCalculationMethod(SpanCalculationMethod::BOOST); });

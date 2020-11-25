@@ -1,11 +1,11 @@
 /**
  * geometric calculations
  * @author Tobias Weber (orcid: 0000-0002-7230-1932)
- * @date 18-Oct-2020
+ * @date Oct/Nov-2020
  * @license: see 'LICENSE' file
  *
- * References:
- *	- http://dx.doi.org/10.1007/3-540-27619-X
+ * Reference for the algorithms:
+ *	- "Algorithmische Geometrie" (2005), ISBN: 978-3540209560 (http://dx.doi.org/10.1007/3-540-27619-X).
  */
 
 #ifndef __GEO2D_H__
@@ -398,12 +398,32 @@ requires m::is_vec<t_vec>
 	return std::make_tuple(verts, mean);
 }
 
+
+/**
+ * geometric series
+ * see: https://en.wikipedia.org/wiki/Geometric_series
+ */
+template<class t_real = double>
+t_real geo_series(t_real x, std::size_t n)
+{
+	/*t_real sum = 0.;
+	 *	for(std::size_t i=0; i<n+1; ++i)
+	 *		sum += std::pow(x, t_real(i));
+	 *	std::cout << "sum: " << sum << std::endl;*/
+
+	if(m::equals<t_real>(x, 1))
+		return t_real(n+1) * x;
+	else
+		return (t_real(1) - std::pow(x, t_real(n+1))) / (t_real(1) - x);
+}
+
 // ----------------------------------------------------------------------------
 
 
 
 // ----------------------------------------------------------------------------
-// convex hull
+// convex hull algorithms
+// Reference: "Algorithmische Geometrie" (2005), ISBN: 978-3540209560, Ch. 4.1, pp. 155f
 // ----------------------------------------------------------------------------
 
 template<class t_vec, class t_real = typename t_vec::value_type>
@@ -886,6 +906,7 @@ requires m::is_vec<t_vec>
 
 // ----------------------------------------------------------------------------
 // delaunay triangulation
+// Reference: "Algorithmische Geometrie" (2005), ISBN: 978-3540209560, Ch. 6, pp. 269f
 // ----------------------------------------------------------------------------
 
 /**
@@ -1333,8 +1354,8 @@ requires m::is_vec<t_vec>
  * get all edges from a delaunay triangulation
  */
 template<class t_vec,
-class t_edge = std::pair<std::size_t, std::size_t>,
-class t_real = typename t_vec::value_type>
+	class t_edge = std::pair<std::size_t, std::size_t>,
+	class t_real = typename t_vec::value_type>
 std::vector<t_edge>
 get_edges(const std::vector<t_vec>& verts, const std::vector<std::vector<t_vec>>& triags, t_real eps)
 {
@@ -1538,6 +1559,7 @@ requires m::is_vec<t_vec>
 
 // ----------------------------------------------------------------------------
 // kernel
+// Reference: "Algorithmische Geometrie" (2005), ISBN: 978-3540209560, Ch. 4.4, pp. 195f
 // ----------------------------------------------------------------------------
 
 template<class t_vec, class t_real = typename t_vec::value_type>
@@ -1721,7 +1743,7 @@ requires m::is_vec<t_vec>
 
 
 /**
- * kernel of a polygon
+ * kernel of a polygon (unfinished!)
  */
 template<class t_vec, class t_real = typename t_vec::value_type>
 std::vector<t_vec>
@@ -1804,6 +1826,7 @@ requires m::is_vec<t_vec>
 
 // ----------------------------------------------------------------------------
 // line segment intersections
+// Reference: "Algorithmische Geometrie" (2005), ISBN: 978-3540209560, Ch. 2.3.2, pp. 64f
 // ----------------------------------------------------------------------------
 
 template<class t_vec, class t_line = std::pair<t_vec, t_vec>>
@@ -2286,8 +2309,8 @@ requires m::is_iterable<t_arr> && m::is_basic_vec<t_arr>
 
 // ----------------------------------------------------------------------------
 // closest pair
-// ----------------------------------------------------------------------------
-
+// Reference: "Algorithmische Geometrie" (2005), ISBN: 978-3540209560,
+//	Ch. 2.2.2, pp. 53f; Ch. 2.3.1, pp. 57f; Ch. 2.4.1, pp. 93f ----------------------------------------------------------------------------
 
 template<class t_vec, class t_real = typename t_vec::value_type>
 std::tuple<const t_vec*, const t_vec*, t_real>
@@ -2502,34 +2525,6 @@ requires m::is_vec<t_vec>
 	}
 
 	return std::make_tuple(points[idx1], points[idx2], dist);
-}
-
-
-// ----------------------------------------------------------------------------
-
-
-
-// ----------------------------------------------------------------------------
-// misc
-// ----------------------------------------------------------------------------
-
-
-/**
- * geometric series
- * see: https://en.wikipedia.org/wiki/Geometric_series
- */
-template<class t_real = double>
-t_real geo_series(t_real x, std::size_t n)
-{
-	/*t_real sum = 0.;
-	for(std::size_t i=0; i<n+1; ++i)
-		sum += std::pow(x, t_real(i));
-	std::cout << "sum: " << sum << std::endl;*/
-
-	if(m::equals<t_real>(x, 1))
-		return t_real(n+1) * x;
-	else
-		return (t_real(1) - std::pow(x, t_real(n+1))) / (t_real(1) - x);
 }
 
 
