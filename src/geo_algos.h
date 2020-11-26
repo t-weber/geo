@@ -1723,7 +1723,7 @@ requires m::is_vec<t_vec>
  */
 template<class t_vec, class t_real = typename t_vec::value_type>
 std::vector<t_vec>
-calc_ker_ineff(const std::vector<t_vec>& verts, t_real eps)
+calc_ker(const std::vector<t_vec>& verts, t_real eps)
 requires m::is_vec<t_vec>
 {
 	if(verts.size() < 3)
@@ -1741,116 +1741,6 @@ requires m::is_vec<t_vec>
 	return ker_from_edges<t_vec, t_edge>(edges, eps);
 }
 
-
-
-/**
- * kernel of a polygon (unfinished!)
- */
-template<class t_vec, class t_real = typename t_vec::value_type>
-std::vector<t_vec>
-calc_ker(const std::vector<t_vec>& verts, t_real eps)
-requires m::is_vec<t_vec>
-{
-	if(verts.size() < 3)
-		return std::vector<t_vec>({});
-
-	using t_edgeidx = std::pair<std::size_t, std::size_t>;
-
-	std::vector<std::size_t> angle_zeros;
-
-	circular_wrapper circularverts(const_cast<std::vector<t_vec>&>(verts));
-	std::optional<t_real> lastangle;
-	std::vector<t_real> angle_ints;
-	t_real angle_int = 0.;
-	for(std::size_t vertidx=0; vertidx < verts.size()*2; ++vertidx)
-	{
-		std::size_t vertidxNext = vertidx+1;
-		const t_vec& vert1 = circularverts[vertidx];
-		const t_vec& vert2 = circularverts[vertidxNext];
-
-		// TODO: check if we need to go ccw or cw
-		t_real angle = t_real{0};
-		//if(lastangle)
-		{
-			angle = line_angle<t_vec>(vert1, vert2);
-			//angle -= *lastangle;
-		}
-		std::cout << "angle: " << angle/m::pi<t_real>*180. << std::endl;
-		angle_int += angle;
-
-		if(m::equals(angle, t_real{0}, eps))
-			angle_zeros.push_back(vertidx % verts.size());
-		else if(lastangle && *lastangle > 0. && angle < 0.)
-			angle_zeros.push_back(vertidx % verts.size());
-		else if(lastangle && *lastangle < 0. && angle > 0.)
-			angle_zeros.push_back(vertidx % verts.size());
-
-		angle_ints.push_back(angle_int);
-		lastangle = angle;
-	}
-
-	std::cout << "zeroes: ";
-	for(std::size_t i=0; i<angle_zeros.size(); ++i)
-		std::cout  << angle_zeros[i] << " ";
-	std::cout << std::endl;
-	std::cout << "int: ";
-	for(std::size_t i=0; i<angle_ints.size(); ++i)
-		std::cout << angle_ints[i]/m::pi<t_real>*180. << " ";
-	std::cout << std::endl << std::endl;
-
-
-	// TODO
-
-
-	std::vector<t_edgeidx> edgesFwd{{std::make_pair(0,1)}};
-	std::vector<t_edgeidx> edgesBwd{{std::make_pair(verts.size()-1, verts.size()-2)}};
-
-	for(std::size_t vertidx=1; vertidx<verts.size(); ++vertidx)
-	{
-		std::size_t vertidxNext = (vertidx+1) % verts.size();
-		const t_vec& vert1 = verts[vertidx];
-		const t_vec& vert2 = verts[vertidxNext];
-
-		const t_vec& lastvert1 = verts[edgesFwd.rbegin()->first];
-		const t_vec& lastvert2 = verts[edgesFwd.rbegin()->second];
-
-		t_real angle = line_angle<t_vec>(lastvert1, lastvert2, vert1, vert2);
-		if(angle > 0.)
-		{
-			edgesFwd.push_back(std::make_pair(vertidx, vertidxNext));
-			std::cout << "edge (fwd): " << vertidx << " " <<vertidxNext << std::endl;
-		}
-	}
-
-	for(std::ptrdiff_t vertidx=verts.size()-2; vertidx>=0; --vertidx)
-	{
-		std::ptrdiff_t vertidxNext = vertidx==0 ? verts.size()-1 : vertidx-1;
-		const t_vec& vert1 = verts[vertidx];
-		const t_vec& vert2 = verts[vertidxNext];
-
-		const t_vec& lastvert1 = verts[edgesBwd.rbegin()->first];
-		const t_vec& lastvert2 = verts[edgesBwd.rbegin()->second];
-
-		t_real angle = line_angle<t_vec>(lastvert1, lastvert2, vert1, vert2);
-		if(angle < 0.)
-		{
-			edgesBwd.push_back(std::make_pair(vertidx, vertidxNext));
-			std::cout << "edge (bwd): " << vertidx << " " <<vertidxNext << std::endl;
-		}
-	}
-
-
-	using t_edge = std::pair<t_vec, t_vec>;
-	std::vector<t_edge> edges;
-
-	for(const t_edgeidx& edge : edgesFwd)
-		edges.push_back(std::make_pair(verts[edge.first], verts[edge.second]));
-
-	for(const t_edgeidx& edge : edgesBwd)
-		edges.push_back(std::make_pair(verts[edge.first], verts[edge.second]));
-
-	return ker_from_edges<t_vec, t_edge>(edges, eps);
-}
 
 
 // ----------------------------------------------------------------------------
