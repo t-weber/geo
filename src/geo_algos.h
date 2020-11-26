@@ -1717,7 +1717,8 @@ requires m::is_vec<t_vec>
 
 
 /**
- * kernel of a polygon (inefficient O(n^2) test)
+ * kernel of a polygon
+ * (still O(n^2)! TODO: only check contributing edges)
  * vertices have to be sorted in ccw order
  */
 template<class t_vec, class t_real = typename t_vec::value_type>
@@ -1755,15 +1756,47 @@ requires m::is_vec<t_vec>
 
 	using t_edgeidx = std::pair<std::size_t, std::size_t>;
 
+	std::vector<std::size_t> angle_zeros;
 
-	for(std::size_t vertidx=0; vertidx<verts.size(); ++vertidx)
+	circular_wrapper circularverts(const_cast<std::vector<t_vec>&>(verts));
+	std::optional<t_real> lastangle;
+	std::vector<t_real> angle_ints;
+	t_real angle_int = 0.;
+	for(std::size_t vertidx=0; vertidx < verts.size()*2; ++vertidx)
 	{
-		std::size_t vertidxNext = (vertidx+1) % verts.size();
-		const t_vec& vert1 = verts[vertidx];
-		const t_vec& vert2 = verts[vertidxNext];
+		std::size_t vertidxNext = vertidx+1;
+		const t_vec& vert1 = circularverts[vertidx];
+		const t_vec& vert2 = circularverts[vertidxNext];
 
-		t_real angle = line_angle<t_vec>(vert1, vert2);
+		// TODO: check if we need to go ccw or cw
+		t_real angle = t_real{0};
+		//if(lastangle)
+		{
+			angle = line_angle<t_vec>(vert1, vert2);
+			//angle -= *lastangle;
+		}
+		std::cout << "angle: " << angle/m::pi<t_real>*180. << std::endl;
+		angle_int += angle;
+
+		if(m::equals(angle, t_real{0}, eps))
+			angle_zeros.push_back(vertidx % verts.size());
+		else if(lastangle && *lastangle > 0. && angle < 0.)
+			angle_zeros.push_back(vertidx % verts.size());
+		else if(lastangle && *lastangle < 0. && angle > 0.)
+			angle_zeros.push_back(vertidx % verts.size());
+
+		angle_ints.push_back(angle_int);
+		lastangle = angle;
 	}
+
+	std::cout << "zeroes: ";
+	for(std::size_t i=0; i<angle_zeros.size(); ++i)
+		std::cout  << angle_zeros[i] << " ";
+	std::cout << std::endl;
+	std::cout << "int: ";
+	for(std::size_t i=0; i<angle_ints.size(); ++i)
+		std::cout << angle_ints[i]/m::pi<t_real>*180. << " ";
+	std::cout << std::endl << std::endl;
 
 
 	// TODO
