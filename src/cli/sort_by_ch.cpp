@@ -9,7 +9,7 @@
 #include <iostream>
 #include <iomanip>
 
-#include "../src/geo_algos.h"
+#include "geo_algos.h"
 
 
 using t_real = double;
@@ -18,12 +18,20 @@ using t_vec = m::vec<t_real, std::vector>;
 
 int main()
 {
+	std::size_t num_pts = 100;
+	t_real min = -100;
+	t_real max = 100;
+
+	std::cout << "Number of random numbers to generate: ";
+	std::cin >> num_pts;
+
+
 	std::vector<t_vec> vecs;
 
 	std::cout << "input sequence: ";
-	for(std::size_t i=0; i<100; ++i)
+	for(std::size_t i=0; i<num_pts; ++i)
 	{
-		t_real num = get_rand<t_real>(-100, 100);
+		t_real num = get_rand<t_real>(min, max);
 		std::cout << num << " ";
 		vecs.emplace_back(m::create<t_vec>({ num, num*num }));
 	}

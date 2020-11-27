@@ -2396,7 +2396,7 @@ requires m::is_vec<t_vec>
 	using t_vertex = geo::model::point<t_real, dim, geo::cs::cartesian>;
 	using t_box = geo::model::box<t_vertex>;
 	using t_rtree_leaf = std::tuple<t_vertex, std::size_t>;
-	using t_rtree = geoidx::rtree<t_rtree_leaf, geoidx::dynamic_rstar>;
+	using t_rtree = geoidx::rtree<t_rtree_leaf, geoidx::dynamic_linear>;
 
 	t_rtree rt(typename t_rtree::parameters_type(points.size()));
 	for(std::size_t ptidx=0; ptidx<points.size(); ++ptidx)

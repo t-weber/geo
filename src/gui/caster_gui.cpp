@@ -3,6 +3,7 @@
  * @date May-2020
  * @license: see 'LICENSE' file
  */
+
 #include "caster_gui.h"
 
 #include <QApplication>
@@ -13,11 +14,10 @@
 #include <iostream>
 
 
-Widget::Widget(QWidget *pParent)
-	: QWidget{pParent},
-		m_up{0}, m_down{0}, m_left{0}, m_right{0},
-		m_pos{0., 0.}, m_dir{0., 0.},
-		m_angle{0.}, m_fov(M_PI/2.)
+CasterWidget::CasterWidget(QWidget *pParent) : QWidget{pParent},
+	m_up{0}, m_down{0}, m_left{0}, m_right{0},
+	m_pos{0., 0.}, m_dir{0., 0.},
+	m_angle{0.}, m_fov(M_PI/2.)
 {
 	{
 		t_poly poly;
@@ -70,18 +70,18 @@ Widget::Widget(QWidget *pParent)
 	setFocusPolicy(Qt::StrongFocus);	// to receive keyboard events
 	setMouseTracking(true);
 
-	connect(&m_timer, &QTimer::timeout, this, static_cast<void (Widget::*)()>(&Widget::tick));
+	connect(&m_timer, &QTimer::timeout, this, static_cast<void (CasterWidget::*)()>(&CasterWidget::tick));
 	m_timer.start(std::chrono::milliseconds(1000 / 60));
 }
 
 
-Widget::~Widget()
+CasterWidget::~CasterWidget()
 {
 	m_timer.stop();
 }
 
 
-void Widget::resizeEvent(QResizeEvent *pEvt)
+void CasterWidget::resizeEvent(QResizeEvent *pEvt)
 {
 	m_screenDims[0] = pEvt->size().width();
 	m_screenDims[1] = pEvt->size().height();
@@ -91,14 +91,14 @@ void Widget::resizeEvent(QResizeEvent *pEvt)
 }
 
 
-void Widget::mouseMoveEvent(QMouseEvent *pEvt)
+void CasterWidget::mouseMoveEvent(QMouseEvent *pEvt)
 {
 	m_posMouse = pEvt->localPos();
 	//std::cout << "pos = (" << m_posMouse.x() << " " << m_posMouse.y() << ")" << std::endl;
 }
 
 
-void Widget::keyPressEvent(QKeyEvent* pEvt)
+void CasterWidget::keyPressEvent(QKeyEvent* pEvt)
 {
 	switch(pEvt->key())
 	{
@@ -110,7 +110,7 @@ void Widget::keyPressEvent(QKeyEvent* pEvt)
 }
 
 
-void Widget::keyReleaseEvent(QKeyEvent* pEvt)
+void CasterWidget::keyReleaseEvent(QKeyEvent* pEvt)
 {
 	switch(pEvt->key())
 	{
@@ -123,28 +123,29 @@ void Widget::keyReleaseEvent(QKeyEvent* pEvt)
 
 
 
-void Widget::paintEvent(QPaintEvent*)
+void CasterWidget::paintEvent(QPaintEvent*)
 {
 	QPainter painter(this);
 	painter.setRenderHints(QPainter::Antialiasing | QPainter::TextAntialiasing);
 
-	QPen penSaved = painter.pen();
-	QPen penHighlight = penSaved;
-	QPen penFilled = penSaved;
+	QPen penGeo, penHighlight, penFilled, penCam;
+	penGeo.setColor(QColor(0x00, 0x00, 0x00));
 	penHighlight.setColor(QColor(0x00, 0x00, 0xff));
-	penHighlight.setWidth(2);
 	penFilled.setColor(QColor(0x00, 0x00, 0x00));
+	penCam.setColor(QColor(0xff, 0x00, 0x00));
+	penGeo.setWidth(1);
+	penHighlight.setWidth(2);
 	penFilled.setWidth(1);
+	penCam.setWidth(1);
 
-	QBrush brushSaved = painter.brush();
-	QBrush brushFilled = brushSaved;
-	QBrush brushTop = brushSaved;
-	QBrush brushBottom = brushSaved;
+	QBrush brushFilled, brushTop, brushBottom, brushCam;
 	brushFilled.setStyle(Qt::SolidPattern);
 	brushTop.setStyle(Qt::SolidPattern);
 	brushBottom.setStyle(Qt::SolidPattern);
-	brushTop.setColor(QColor{0xee, 0xee, 0xee, 0xff});
-	brushBottom.setColor(QColor{0xff, 0xff, 0xff, 0xff});
+	brushCam.setStyle(Qt::SolidPattern);
+	brushTop.setColor(QColor{0xff, 0xff, 0xff, 0xff});
+	brushBottom.setColor(QColor{0xe0, 0xe0, 0xe0, 0xff});
+	brushCam.setColor(QColor{0xff, 0x00, 0x00, 0xff});
 
 	t_real column_w = 1. / t_real(m_casted.size());
 	t_real maxDist = 10.f;
@@ -155,7 +156,6 @@ void Widget::paintEvent(QPaintEvent*)
 	painter.drawRect(QRectF{ToScreenCoords(QVector2D{-0.5f, 0.f}), ToScreenCoords(QVector2D{0.5f, 0.5f})});
 	painter.setBrush(brushBottom);
 	painter.drawRect(QRectF{ToScreenCoords(QVector2D{-0.5f, 0.f}), ToScreenCoords(QVector2D{0.5f, -0.5f})});
-	painter.setBrush(brushSaved);
 
 
 	for(std::size_t idx=0; idx<m_casted.size(); ++idx)
@@ -184,12 +184,11 @@ void Widget::paintEvent(QPaintEvent*)
 		painter.setPen(penFilled);
 		painter.setBrush(brushFilled);
 		painter.drawRect(QRectF{ToScreenCoords(topL), ToScreenCoords(bottomR)});
-		painter.setBrush(brushSaved);
-		painter.setPen(penSaved);
 	}
 
 
 	// draw geometry
+	painter.setPen(penGeo);
 	for(const t_poly& poly : m_geo)
 	{
 		for(std::size_t i=0; i<poly.outer().size(); ++i)
@@ -205,6 +204,8 @@ void Widget::paintEvent(QPaintEvent*)
 
 
 	// position and direction of camera
+	painter.setPen(penCam);
+	painter.setBrush(brushCam);
 	painter.drawEllipse(ToSidescreenCoords(m_pos), 2.5, 2.5);
 	//painter.drawLine(ToSidescreenCoords(m_pos), ToSidescreenCoords(m_pos + m_dir*0.05));
 
@@ -212,26 +213,29 @@ void Widget::paintEvent(QPaintEvent*)
 	painter.drawLine(ToSidescreenCoords(m_pos), ToSidescreenCoords(m_pos + m_fovlines[0]*0.05f));
 	painter.drawLine(ToSidescreenCoords(m_pos), ToSidescreenCoords(m_pos + m_fovlines[1]*0.05f));
 
+
 	// intersection points
 	painter.setPen(penHighlight);
 	for(const Casted& casted : m_casted)
 		painter.drawPoint(ToSidescreenCoords(QVector2D(casted.vertex.get<0>(), casted.vertex.get<1>())));
-	painter.setPen(penSaved);
 }
 
 
-void Widget::tick()
+void CasterWidget::tick()
 {
 	tick(std::chrono::milliseconds(1000 / 60));
 }
 
 
-void Widget::tick(const std::chrono::milliseconds& ms)
+void CasterWidget::tick(const std::chrono::milliseconds& ms)
 {
+	const t_real angle_delta = 3e-3;
+	const t_real pos_delta = 2e-4;
+
 	if(m_right)
-		m_angle -= 3e-3*t_real(ms.count());
+		m_angle -= angle_delta*t_real(ms.count());
 	if(m_left)
-		m_angle += 3e-3*t_real(ms.count());
+		m_angle += angle_delta*t_real(ms.count());
 
 	// update position and fov angle
 	m_dir = QVector2D{std::cos(m_angle), std::sin(m_angle)};
@@ -239,9 +243,9 @@ void Widget::tick(const std::chrono::milliseconds& ms)
 	m_fovlines[1] = QVector2D{std::cos(m_angle+m_fov*0.5f), std::sin(m_angle+m_fov*0.5f)};
 
 	if(m_up)
-		m_pos += m_dir * 2e-4*t_real(ms.count());
+		m_pos += m_dir * pos_delta*t_real(ms.count());
 	if(m_down)
-		m_pos -= m_dir * 2e-4*t_real(ms.count());
+		m_pos -= m_dir * pos_delta*t_real(ms.count());
 
 
 	// fov ray intersections
@@ -293,7 +297,7 @@ void Widget::tick(const std::chrono::milliseconds& ms)
 }
 
 
-QPointF Widget::ToScreenCoords(const QVector2D& vec)
+QPointF CasterWidget::ToScreenCoords(const QVector2D& vec)
 {
 	return QPointF(
 		(vec[0]+0.5)*m_screenDims[0],
@@ -301,7 +305,7 @@ QPointF Widget::ToScreenCoords(const QVector2D& vec)
 }
 
 
-QPointF Widget::ToSidescreenCoords(const QVector2D& vec)
+QPointF CasterWidget::ToSidescreenCoords(const QVector2D& vec)
 {
 	return QPointF(
 		m_screenDims[0] - (vec[0]+0.5)*m_screenDims[0]*0.3,
@@ -314,8 +318,8 @@ QPointF Widget::ToSidescreenCoords(const QVector2D& vec)
 
 
 // ----------------------------------------------------------------------------
-TstDlg::TstDlg(QWidget* pParent) : QDialog{pParent},
-	m_pWidget{new Widget(this)}
+CasterDlg::CasterDlg(QWidget* pParent) : QDialog{pParent},
+	m_pWidget{new CasterWidget(this)}
 {
 	auto pGrid = new QGridLayout(this);
 	pGrid->setSpacing(2);
@@ -343,7 +347,7 @@ int main(int argc, char** argv)
 	auto app = std::make_unique<QApplication>(argc, argv);
 	set_locales();
 
-	auto dlg = std::make_unique<TstDlg>(nullptr);
+	auto dlg = std::make_unique<CasterDlg>(nullptr);
 	dlg->resize(800, 700);
 	dlg->show();
 

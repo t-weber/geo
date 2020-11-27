@@ -11,7 +11,7 @@
 
 
 #include <chrono>
-#include "../src/geo_algos.h"
+#include "geo_algos.h"
 
 
 using t_real = /*long*/ double;
@@ -26,6 +26,9 @@ int main()
 	std::size_t num_pts = 1000;
 	t_real min = -100;
 	t_real max = 100;
+
+	std::cout << "Number of random points to generate: ";
+	std::cin >> num_pts;
 
 	std::vector<t_vec> points;
 	points.reserve(num_pts);

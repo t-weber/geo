@@ -38,7 +38,6 @@ add_executable(voro
 	src/gui/voro_gui.cpp src/gui/voro_gui.h
 	src/geo_algos.h src/math_algos.h
 )
-
 target_link_libraries(voro
 	Qt5::Core Qt5::Gui Qt5::Widgets Qt5::Svg
 	-lqhull_r -lqhullcpp
@@ -49,7 +48,6 @@ add_executable(vis
 	src/gui/vis_gui.cpp src/gui/vis_gui.h
 	src/geo_algos.h src/math_algos.h
 )
-
 target_link_libraries(vis
 	Qt5::Core Qt5::Gui Qt5::Widgets Qt5::Svg
 )
@@ -59,7 +57,6 @@ add_executable(lines
 	src/gui/lines_gui.cpp src/gui/lines_gui.h
 	src/geo_algos.h src/math_algos.h
 )
-
 target_link_libraries(lines
 	Qt5::Core Qt5::Gui Qt5::Widgets Qt5::Svg
 	Threads::Threads
@@ -69,8 +66,15 @@ target_link_libraries(lines
 add_executable(caster
 	src/gui/caster_gui.cpp src/gui/caster_gui.h
 )
-
 target_link_libraries(caster
 	Qt5::Core Qt5::Gui Qt5::Widgets
 	${Boost_LIBRARIES}
 )
+
+
+add_executable(closestpair src/cli/closestpair.cpp)
+target_link_libraries(closestpair ${Boost_LIBRARIES})
+
+
+add_executable(sort_by_ch src/cli/sort_by_ch.cpp)
+target_link_libraries(sort_by_ch ${Boost_LIBRARIES})

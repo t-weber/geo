@@ -7,7 +7,6 @@
 #ifndef __CASTER_H__
 #define __CASTER_H__
 
-
 #include <QDialog>
 #include <QTimer>
 #include <QPaintEvent>
@@ -24,6 +23,9 @@
 namespace geo = boost::geometry;
 
 
+#define NUM_RAYS 192
+
+
 using t_real = float;
 using t_vertex = geo::model::point<t_real, 2, geo::cs::cartesian>;
 using t_poly = geo::model::polygon<t_vertex, true, false>;
@@ -38,13 +40,13 @@ struct Casted
 };
 
 
-class Widget : public QWidget
+class CasterWidget : public QWidget
 {
 public:
 	using QWidget::QWidget;
 
-	Widget(QWidget *pParent);
-	virtual ~Widget();
+	CasterWidget(QWidget *pParent);
+	virtual ~CasterWidget();
 
 	QPointF ToScreenCoords(const QVector2D& vec);
 	QPointF ToSidescreenCoords(const QVector2D& vec);
@@ -72,22 +74,22 @@ private:
 	t_real m_angle{}, m_fov{};
 	QVector2D m_fovlines[2];
 
-	std::array<Casted, 128> m_casted{};
+	std::array<Casted, NUM_RAYS> m_casted{};
 
 protected slots:
 	void tick();
 };
 
 
-class TstDlg : public QDialog
+class CasterDlg : public QDialog
 {
 public:
 	using QDialog::QDialog;
-	TstDlg(QWidget* pParent);
-	~TstDlg() = default;
+	CasterDlg(QWidget* pParent);
+	~CasterDlg() = default;
 
 private:
-	std::shared_ptr<Widget> m_pWidget;
+	std::shared_ptr<CasterWidget> m_pWidget;
 };
 
 
