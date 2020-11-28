@@ -19,6 +19,8 @@ using t_tree = RangeTree<t_vec>;
 
 int main()
 {
+	using namespace m_ops;
+
 	t_tree tree;
 
 	tree.insert(m::create<t_vec>( {3., 4.} ));
@@ -27,8 +29,13 @@ int main()
 	tree.insert(m::create<t_vec>( {-5., 10.} ));
 	tree.insert(m::create<t_vec>( {-12., 2.} ));
 	tree.update();
-
 	std::cout << tree << std::endl;
+
+	std::cout << "\nrange query:\n";
+	auto vecs = tree.query_range(m::create<t_vec>( {0., 0.} ), m::create<t_vec>( {10., 10.} ));
+	for(const t_vec* vec : vecs)
+		std::cout << *vec << "\n";
+	std::cout << std::endl;
 
 	return 0;
 }

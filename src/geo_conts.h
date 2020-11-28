@@ -36,6 +36,9 @@
 #endif
 
 
+template<class t_vec> class RangeTree;
+
+
 template<class t_vec>
 struct RangeTreeNode
 {
@@ -54,15 +57,28 @@ struct RangeTreeNode
 	RangeTreeNode<t_vec> *parent = nullptr;
 	RangeTreeNode<t_vec> *left = nullptr, *right = nullptr;
 
-	const t_vec* vec = nullptr;
+	// range tree for idx+1
+	std::shared_ptr<RangeTree<t_vec>> nextidxtree{};
+
+	std::shared_ptr<const t_vec> vec{};
+
+	std::size_t dim = 0;
 	std::size_t idx = 0;
 	t_real range[2] = { 0., 0. };
 
 
-	friend bool operator<(const RangeTreeNode<t_vec>& e1, const RangeTreeNode<t_vec>& e2)
+	/**
+	 * get all nodes in a linear fashion
+	 */
+	static void get_vecs(const RangeTreeNode<t_vec>* node, std::vector<std::shared_ptr<const t_vec>>& vecs)
 	{
-		// compare by idx
-		return (*e1.vec)[e1.idx] < (*e2.vec)[e2.idx];
+		if(node->left)
+			get_vecs(node->left, vecs);
+
+		vecs.push_back(node->vec);
+
+		if(node->right)
+			get_vecs(node->right, vecs);
 	}
 
 
@@ -79,6 +95,8 @@ struct RangeTreeNode
 			ostr << "null";
 		ostr << ", idx: " << node->idx;
 		ostr << ", range: " << node->range[0] << ".." << node->range[1] << "\n";
+		//if(node->nextidxtree)
+		//	ostr << "next index tree: " << *node->nextidxtree << "---------------------\n";
 
 		if(node->left || node->right)
 		{
@@ -105,6 +123,13 @@ struct RangeTreeNode
 	{
 		node.print(ostr);
 		return ostr;
+	}
+
+
+	friend bool operator<(const RangeTreeNode<t_vec>& e1, const RangeTreeNode<t_vec>& e2)
+	{
+		// compare by idx
+		return (*e1.vec)[e1.idx] < (*e2.vec)[e2.idx];
 	}
 };
 
@@ -220,7 +245,7 @@ public:
 
 
 public:
-	RangeTree()
+	RangeTree(std::size_t idx=0) : m_idx{idx}
 	{
 		t_treealgos::init_header(&m_root);
 	}
@@ -232,10 +257,63 @@ public:
 	}
 
 
+	/**
+	 * query a rectangular range
+	 * TODO
+	 */
+	std::vector<const t_vec*> query_range(const t_vec& min, const t_vec& max)
+	{
+		t_node nodemin{.vec=std::make_shared<t_vec>(min), .dim=min.size(), .idx=0};
+		t_node nodemax{.vec=std::make_shared<t_vec>(max), .dim=max.size(), .idx=0};
+
+		auto [begin, end] = t_treealgos::bounded_range(&m_root, &nodemin, &nodemax,
+			[](const t_node* node1, const t_node* node2) -> bool
+			{
+				return *node1 < *node2;
+			}, true, true);
+
+		std::vector<const t_vec*> vecs;
+		for(auto iter=begin; iter!=end; iter=t_treealgos::next_node(iter))
+		{
+			vecs.push_back(iter->vec.get());
+		}
+
+		return vecs;
+	}
+
+
+	void insert(const std::vector<t_vec>& vecs)
+	{
+		for(const t_vec& vec : vecs)
+			insert(vec);
+		update();
+	}
+
+
+	void insert(const std::vector<std::shared_ptr<const t_vec>>& vecs)
+	{
+		for(const std::shared_ptr<const t_vec>& vec : vecs)
+			insert(vec);
+		update();
+	}
+
+
 	void insert(const t_vec& vec)
 	{
-		t_node* node = new t_node{.vec=new t_vec(vec), .idx=0};
+		t_node* node = new t_node{.vec=std::make_shared<t_vec>(vec), .dim=vec.size(), .idx=m_idx};
+		insert(node);
+	}
 
+
+	void insert(const std::shared_ptr<const t_vec>& vec)
+	{
+		t_node* node = new t_node{.vec=vec, .dim=vec->size(), .idx=m_idx};
+		insert(node);
+	}
+
+
+	void insert(t_node* node)
+	{
 		t_treealgos::insert_equal(&m_root, root(), node,
 			[](const t_node* node1, const t_node* node2) -> bool
 			{
@@ -269,12 +347,16 @@ public:
 		t_node* left = node->left;
 		t_node* right = node->right;
 
+		if(left) update(left);
+		if(right) update(right);
+
+
+		// --------------------------------------------------------------------
+		// ranges
+		// --------------------------------------------------------------------
 		// leaf node
 		if(!left && !right && node->vec)
 			node->range[0] = node->range[1] = (*node->vec)[node->idx];
-
-		if(left) update(left);
-		if(right) update(right);
 
 		if(left && !right)
 		{
@@ -299,6 +381,22 @@ public:
 			node->range[0] = left->range[0];
 			node->range[1] = right->range[1];
 		}
+		// --------------------------------------------------------------------
+
+
+		// --------------------------------------------------------------------
+		// subtree for next index
+		// --------------------------------------------------------------------
+		if(node->idx+1 < node->dim)
+		{
+			node->nextidxtree = std::make_shared<RangeTree<t_vec>>(node->idx+1);
+
+			std::vector<std::shared_ptr<const t_vec>> vecs;
+			RangeTreeNode<t_vec>::get_vecs(node, vecs);
+
+			node->nextidxtree->insert(vecs);
+		}
+		// --------------------------------------------------------------------
 	}
 
 
@@ -309,7 +407,6 @@ public:
 		free_nodes(node->left);
 		free_nodes(node->right);
 
-		if(node->vec) delete node->vec;
 		delete node;
 	}
 
@@ -323,6 +420,7 @@ public:
 
 private:
 	t_node m_root{};
+	std::size_t m_idx = 0;
 };
 
 
