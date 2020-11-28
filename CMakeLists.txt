@@ -40,7 +40,9 @@ add_executable(voro
 )
 target_link_libraries(voro
 	Qt5::Core Qt5::Gui Qt5::Widgets Qt5::Svg
+	${Boost_LIBRARIES}
 	-lqhull_r -lqhullcpp
+	#-lqhullstatic_r -lqhullcpp
 )
 
 
@@ -50,6 +52,7 @@ add_executable(vis
 )
 target_link_libraries(vis
 	Qt5::Core Qt5::Gui Qt5::Widgets Qt5::Svg
+	${Boost_LIBRARIES}
 )
 
 
@@ -59,6 +62,7 @@ add_executable(lines
 )
 target_link_libraries(lines
 	Qt5::Core Qt5::Gui Qt5::Widgets Qt5::Svg
+	${Boost_LIBRARIES}
 	Threads::Threads
 )
 
