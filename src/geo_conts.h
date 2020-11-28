@@ -236,7 +236,6 @@ public:
 	{
 		t_node* node = new t_node{.vec=new t_vec(vec), .idx=0};
 
-		//m_tree.insert_equal(m_nodes[m_nodes.size()-1]);
 		t_treealgos::insert_equal(&m_root, root(), node,
 			[](const t_node* node1, const t_node* node2) -> bool
 			{
@@ -267,18 +266,8 @@ public:
 	{
 		if(!node) return;
 
-		using node_traits = t_nodetraits; /*typename t_tree::value_traits::node_traits*/;
-		t_node* left = node_traits::get_left(node);
-		t_node* right = node_traits::get_right(node);
-		//t_node* left = node->left;
-		//t_node* right = node->right;
-
-		/*
-		if(left && left->parent != node)
-			left = nullptr;
-		if(right && right->parent != node)
-			right = nullptr;
-		*/
+		t_node* left = node->left;
+		t_node* right = node->right;
 
 		// leaf node
 		if(!left && !right && node->vec)
