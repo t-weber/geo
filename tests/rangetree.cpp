@@ -19,9 +19,16 @@ using t_tree = RangeTree<t_vec>;
 
 int main()
 {
-	t_tree tree(100);
+	t_tree tree;
 
+	tree.insert(m::create<t_vec>( {3., 4.} ));
 	tree.insert(m::create<t_vec>( {1., 2.} ));
+	tree.insert(m::create<t_vec>( {7., -1.} ));
+	tree.insert(m::create<t_vec>( {-5., 10.} ));
+	tree.insert(m::create<t_vec>( {-12., 2.} ));
+	tree.update();
+
+	std::cout << tree << std::endl;
 
 	return 0;
 }
