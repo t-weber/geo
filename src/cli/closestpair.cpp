@@ -83,5 +83,20 @@ int main()
 			<< ", dist: " << dist  << ", time: " << elapsed.count() << " ms" << std::endl;
 	}
 
+
+	{
+		auto starttime = std::chrono::steady_clock::now();
+
+		auto [pt1, pt2, dist] = closest_pair_rangetree<2, t_vec>(points);
+		//if(pt1[0] > pt2[0])
+		//	std::swap(pt1, pt2);
+
+		auto stoptime = std::chrono::steady_clock::now();
+		auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(stoptime - starttime);
+
+		std::cout << "Closest pair (range): point 1: " << pt1 << ", point 2: " << pt2
+			<< ", dist: " << dist  << ", time: " << elapsed.count() << " ms" << std::endl;
+	}
+
 	return 0;
 }

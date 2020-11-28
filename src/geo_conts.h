@@ -6,7 +6,7 @@
  *
  * References:
  *	- "Algorithmische Geometrie" (2005), ISBN: 978-3540209560 (http://dx.doi.org/10.1007/3-540-27619-X).
- *  - https://www.boost.org/doc/libs/1_74_0/doc/html/intrusive/node_algorithms.html
+ *	- https://www.boost.org/doc/libs/1_74_0/doc/html/intrusive/node_algorithms.html
  */
 
 #ifndef __GEOCONT_H__
@@ -70,15 +70,32 @@ struct RangeTreeNode
 	/**
 	 * get all nodes in a linear fashion
 	 */
-	static void get_vecs(const RangeTreeNode<t_vec>* node, std::vector<std::shared_ptr<const t_vec>>& vecs)
+	static void get_vecs(
+		const RangeTreeNode<t_vec>* node,
+		std::vector<std::shared_ptr<const t_vec>>& vecs,
+		const t_vec* min=nullptr, const t_vec* max=nullptr)
 	{
-		if(node->left)
-			get_vecs(node->left, vecs);
+		auto is_in_range = [](const t_vec& vec, const t_vec& min, const t_vec& max, std::size_t dim) -> bool
+		{
+			for(std::size_t idx=0; idx<dim; ++idx)
+			{
+				if(vec[idx] < min[idx] || vec[idx] > max[idx])
+					return false;
+			}
+			return true;
+		};
 
-		vecs.push_back(node->vec);
+		if(node->left)
+			get_vecs(node->left, vecs, min, max);
+
+		bool in_range = true;
+		if(min && max)
+			in_range = is_in_range(*node->vec, *min, *max, node->dim);
+		if(in_range)
+			vecs.push_back(node->vec);
 
 		if(node->right)
-			get_vecs(node->right, vecs);
+			get_vecs(node->right, vecs, min, max);
 	}
 
 
@@ -253,35 +270,77 @@ public:
 
 	~RangeTree()
 	{
-		free_nodes(root());
+		free_nodes(get_root());
 	}
 
 
 	/**
 	 * query a rectangular range
-	 * TODO
 	 */
-	std::vector<const t_vec*> query_range(const t_vec& min, const t_vec& max)
+	std::vector<std::shared_ptr<const t_vec>> query_range(const t_vec& _min, const t_vec& _max)
 	{
-		t_node nodemin{.vec=std::make_shared<t_vec>(min), .dim=min.size(), .idx=0};
-		t_node nodemax{.vec=std::make_shared<t_vec>(max), .dim=max.size(), .idx=0};
-
-		auto [begin, end] = t_treealgos::bounded_range(&m_root, &nodemin, &nodemax,
-			[](const t_node* node1, const t_node* node2) -> bool
-			{
-				return *node1 < *node2;
-			}, true, true);
-
-		std::vector<const t_vec*> vecs;
-		for(auto iter=begin; iter!=end; iter=t_treealgos::next_node(iter))
+		auto is_in_range = [](const t_node* node, const t_vec& min, const t_vec& max) -> bool
 		{
-			vecs.push_back(iter->vec.get());
+			const std::size_t idx = node->idx;
+			return node->range[0] <= min[idx] && node->range[1] >= max[idx];
+		};
+
+		const t_node* node = get_root();
+		t_vec min = _min, max = _max;
+
+		// iterate coordinate sub-trees
+		while(true)
+		{
+			// fit query rectangle to range
+			if(min[node->idx] < node->range[0])
+				min[node->idx] = node->range[0];
+			if(max[node->idx] > node->range[1])
+				max[node->idx] = node->range[1];
+
+			if(!is_in_range(node, min, max))
+			{
+				return {};
+			}
+			else
+			{
+				// descend tree to find the smallest fitting range
+				while(1)
+				{
+					bool updated = false;
+					if(node->left && is_in_range(node->left, min, max))
+					{
+						node = node->left;
+						updated = true;
+					}
+					else if(node->right && is_in_range(node->right, min, max))
+					{
+						node = node->right;
+						updated = true;
+					}
+
+					// no more updates
+					if(!updated)
+						break;
+				}
+			}
+
+			if(!node->nextidxtree)
+				break;
+
+			node = node->nextidxtree->get_root();
+			if(!node)
+				break;
 		}
 
+		std::vector<std::shared_ptr<const t_vec>> vecs;
+		t_node::get_vecs(node, vecs, &min, &max);
 		return vecs;
 	}
 
 
+	/**
+	 * insert a collection of vectors
+	 */
 	void insert(const std::vector<t_vec>& vecs)
 	{
 		for(const t_vec& vec : vecs)
@@ -290,6 +349,9 @@ public:
 	}
 
 
+	/**
+	 * insert a collection of vectors
+	 */
 	void insert(const std::vector<std::shared_ptr<const t_vec>>& vecs)
 	{
 		for(const std::shared_ptr<const t_vec>& vec : vecs)
@@ -298,6 +360,9 @@ public:
 	}
 
 
+	/**
+	 * insert a vector
+	 */
 	void insert(const t_vec& vec)
 	{
 		t_node* node = new t_node{.vec=std::make_shared<t_vec>(vec), .dim=vec.size(), .idx=m_idx};
@@ -305,6 +370,9 @@ public:
 	}
 
 
+	/**
+	 * insert a vector
+	 */
 	void insert(const std::shared_ptr<const t_vec>& vec)
 	{
 		t_node* node = new t_node{.vec=vec, .dim=vec->size(), .idx=m_idx};
@@ -312,23 +380,13 @@ public:
 	}
 
 
-	void insert(t_node* node)
-	{
-		t_treealgos::insert_equal(&m_root, root(), node,
-			[](const t_node* node1, const t_node* node2) -> bool
-			{
-				return *node1 < *node2;
-			});
-	}
-
-
-	const t_node* root() const
+	const t_node* get_root() const
 	{
 		return t_treealgos::root_node(&m_root);
 	}
 
 
-	t_node* root()
+	t_node* get_root()
 	{
 		return t_treealgos::root_node(&m_root);
 	}
@@ -336,7 +394,7 @@ public:
 
 	void update()
 	{
-		update(root());
+		update(get_root());
 	}
 
 
@@ -413,10 +471,23 @@ public:
 
 	friend std::ostream& operator<<(std::ostream& ostr, const RangeTree<t_vec>& tree)
 	{
-		ostr << *tree.root();
+		ostr << *tree.get_root();
 		return ostr;
 	}
 
+
+protected:
+	/**
+	 * insert a node
+	 */
+	void insert(t_node* node)
+	{
+		t_treealgos::insert_equal(&m_root, get_root(), node,
+			[](const t_node* node1, const t_node* node2) -> bool
+			{
+				return *node1 < *node2;
+			});
+	}
 
 private:
 	t_node m_root{};

@@ -24,6 +24,7 @@
 
 #include "math_algos.h"
 #include "math_conts.h"
+#include "geo_conts.h"
 #include "helpers.h"
 
 #include <boost/intrusive/bstree.hpp>
@@ -2448,6 +2449,58 @@ requires m::is_vec<t_vec>
 	}
 
 	return std::make_tuple(points[idx1], points[idx2], dist);
+}
+
+
+/**
+ * closest pair (range tree)
+ */
+template<std::size_t dim, class t_vec, class t_real = typename t_vec::value_type>
+std::tuple<t_vec, t_vec, t_real>
+closest_pair_rangetree(const std::vector<t_vec>& _points)
+requires m::is_vec<t_vec>
+{
+	RangeTree<t_vec> tree;
+	tree.insert(_points);
+
+	// get x-sorted points
+	std::vector<std::shared_ptr<const t_vec>> points;
+	RangeTree<t_vec>::t_node::get_vecs(tree.get_root(), points);
+
+	const t_vec* pt1 = points[0].get();
+	const t_vec* pt2 = points[1].get();
+	t_vec query1 = m::create<t_vec>(dim);
+	t_vec query2 = m::create<t_vec>(dim);
+
+	t_real dist = m::norm<t_vec>(*pt2 - *pt1);
+	for(std::size_t ptidx=1; ptidx<points.size(); ++ptidx)
+	{
+		const t_vec& curpt = *points[ptidx];
+
+		query1[0] = curpt[0] - dist;
+		query2[0] = curpt[0];
+
+		for(std::size_t i=1; i<dim; ++i)
+		{
+			query1[i] = curpt[i] - dist;
+			query2[i] = curpt[i] + dist;
+		}
+
+		auto query_answer = tree.query_range(query1, query2);
+
+		for(const auto& answ : query_answer)
+		{
+			t_real newdist = m::norm<t_vec>(*answ - curpt);
+			if(answ.get() != &curpt && newdist < dist)
+			{
+				dist = newdist;
+				pt1 = answ.get();
+				pt2 = &curpt;
+			}
+		}
+	}
+
+	return std::make_tuple(*pt1, *pt2, dist);
 }
 
 
