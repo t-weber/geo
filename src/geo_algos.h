@@ -8,8 +8,8 @@
  *	- "Algorithmische Geometrie" (2005), ISBN: 978-3540209560 (http://dx.doi.org/10.1007/3-540-27619-X).
  */
 
-#ifndef __GEO2D_H__
-#define __GEO2D_H__
+#ifndef __GEO2D_ALGOS_H__
+#define __GEO2D_ALGOS_H__
 
 #include <vector>
 #include <queue>

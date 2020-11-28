@@ -5,12 +5,12 @@
  * @license: see 'LICENSE' file
  *
  * References:
- *	- "Algorithmische Geometrie" (2005), ISBN: 978-3540209560 (http://dx.doi.org/10.1007/3-540-27619-X).
+ *	- "Algorithmische Geometrie" (2005), ISBN: 978-3540209560 (http://dx.doi.org/10.1007/3-540-27619-X), Ch. 3.3.2, pp. 135f (range tree)
  *	- https://www.boost.org/doc/libs/1_74_0/doc/html/intrusive/node_algorithms.html
  */
 
-#ifndef __GEOCONT_H__
-#define __GEOCONT_H__
+#ifndef __GEO_CONTS_H__
+#define __GEO_CONTS_H__
 
 /**
  * 1: binary search tree
@@ -26,6 +26,7 @@
 
 #include <iostream>
 #include <cstdint>
+
 
 #if RANGE_TREE_IMPL==1
 	#include <boost/intrusive/bstree_algorithms.hpp>
