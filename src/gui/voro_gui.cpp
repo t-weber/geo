@@ -196,7 +196,7 @@ void HullScene::UpdateHull()
 	std::vector<t_vec> vertices;
 	vertices.reserve(m_vertices.size());
 	std::transform(m_vertices.begin(), m_vertices.end(), std::back_inserter(vertices),
-				   [](const Vertex* vert) -> t_vec { return m::create<t_vec>({vert->x(), vert->y()}); } );
+		[](const Vertex* vert) -> t_vec { return m::create<t_vec>({vert->x(), vert->y()}); } );
 
 
 	std::vector<std::vector<t_vec>> hull;
@@ -204,17 +204,17 @@ void HullScene::UpdateHull()
 	switch(m_hullcalculationmethod)
 	{
 		case HullCalculationMethod::QHULL:
-			std::tie(std::ignore, hull, std::ignore) = calc_delaunay<t_vec>(2, vertices, true);
+			std::tie(std::ignore, hull, std::ignore) = g::calc_delaunay<t_vec>(2, vertices, true);
 			break;
 		case HullCalculationMethod::CONTOUR:
-			hull.emplace_back(calc_hull_contour<t_vec>(vertices, g_eps));
+			hull.emplace_back(g::calc_hull_contour<t_vec>(vertices, g_eps));
 			break;
 		case HullCalculationMethod::ITERATIVE:
 			//hull.emplace_back(calc_hull_iterative<t_vec>(vertices));
-			hull.emplace_back(calc_hull_iterative_bintree<t_vec>(vertices, g_eps));
+			hull.emplace_back(g::calc_hull_iterative_bintree<t_vec>(vertices, g_eps));
 			break;
 		case HullCalculationMethod::RECURSIVE:
-			hull.emplace_back(calc_hull_recursive<t_vec>(vertices, g_eps));
+			hull.emplace_back(g::calc_hull_recursive<t_vec>(vertices, g_eps));
 			break;
 		default:
 			QMessageBox::critical(m_parent, "Error", "Unknown hull calculation method.");
@@ -295,13 +295,13 @@ void HullScene::UpdateDelaunay()
 	switch(m_delaunaycalculationmethod)
 	{
 		case DelaunayCalculationMethod::QHULL:
-			std::tie(voronoi, triags, neighbours) = calc_delaunay<t_vec>(2, vertices, false);
+			std::tie(voronoi, triags, neighbours) = g::calc_delaunay<t_vec>(2, vertices, false);
 			break;
 		case DelaunayCalculationMethod::ITERATIVE:
-			std::tie(voronoi, triags, neighbours) = calc_delaunay_iterative<t_vec>(vertices, g_eps);
+			std::tie(voronoi, triags, neighbours) = g::calc_delaunay_iterative<t_vec>(vertices, g_eps);
 			break;
 		case DelaunayCalculationMethod::PARABOLIC:
-			std::tie(voronoi, triags, neighbours) = calc_delaunay_parabolic<t_vec>(vertices);
+			std::tie(voronoi, triags, neighbours) = g::calc_delaunay_parabolic<t_vec>(vertices);
 			break;
 		default:
 			QMessageBox::critical(m_parent, "Error", "Unknown Delaunay calculation method.");
@@ -390,7 +390,7 @@ void HullScene::UpdateDelaunay()
 				// slopes of existing voronoi edges
 				std::vector<t_real> slopes;
 				for(const t_vec* vec : neighbourverts)
-					slopes.push_back(line_angle(voronoivert, *vec));
+					slopes.push_back(g::line_angle(voronoivert, *vec));
 
 				// iterate delaunay triangle vertices
 				for(std::size_t idx1=0; idx1<thetriag.size(); ++idx1)
@@ -400,7 +400,7 @@ void HullScene::UpdateDelaunay()
 						idx2 = 0;
 
 					t_vec vecMid = thetriag[idx1] + (thetriag[idx2] - thetriag[idx1]) * t_real{0.5};
-					t_real angle = line_angle(voronoivert, vecMid);
+					t_real angle = g::line_angle(voronoivert, vecMid);
 
 					// if the slope angle doesn't exist yet, it leads to an unbound external region
 					if(auto iterSlope = std::find_if(slopes.begin(), slopes.end(), [angle](t_real angle2) -> bool
@@ -412,7 +412,7 @@ void HullScene::UpdateDelaunay()
 						t_vec vecOuter = voronoivert;
 
 						// voronoi vertex on other side of edge?
-						if(side_of_line<t_vec>(thetriag[idx1], thetriag[idx2], voronoivert) < 0.)
+						if(g::side_of_line<t_vec>(thetriag[idx1], thetriag[idx2], voronoivert) < 0.)
 							vecOuter -= lengthUnbound*vecUnbound;
 						else
 							vecOuter += lengthUnbound*vecUnbound;
@@ -458,16 +458,16 @@ void HullScene::UpdateDelaunay()
 		penKruskal.setWidthF(2.);
 		penKruskal.setColor(QColor::fromRgbF(0.,0.7,0.));
 
-		auto edges = get_edges(vertices, triags, g_eps);
+		auto edges = g::get_edges(vertices, triags, g_eps);
 		std::vector<std::pair<std::size_t, std::size_t>> span;
 
 		switch(m_spancalculationmethod)
 		{
 			case SpanCalculationMethod::KRUSKAL:
-				span = calc_min_spantree<t_vec>(vertices, edges);
+				span = g::calc_min_spantree<t_vec>(vertices, edges);
 				break;
 			case SpanCalculationMethod::BOOST:
-				span = calc_min_spantree_boost<t_vec>(vertices);
+				span = g::calc_min_spantree_boost<t_vec>(vertices);
 				break;
 			default:
 				QMessageBox::critical(m_parent, "Error", "Unknown span tree calculation method.");

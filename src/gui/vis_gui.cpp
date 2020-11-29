@@ -241,7 +241,7 @@ void VisView::UpdateAll()
 		[](const Vertex* vert) -> t_vec { return m::create<t_vec>({vert->x(), vert->y()}); } );
 
 	if(m_sortvertices)
-		std::tie(m_vertices, std::ignore) = sort_vertices_by_angle<t_vec>(m_vertices);
+		std::tie(m_vertices, std::ignore) = g::sort_vertices_by_angle<t_vec>(m_vertices);
 
 	UpdateEdges();
 	UpdateKer();
@@ -295,8 +295,8 @@ void VisView::UpdateKer()
 	for(auto iter=m_vertices.rbegin(); iter!=m_vertices.rend(); ++iter)
 		verts_reversed.push_back(*iter);
 
-	auto kerpoly = calc_ker<t_vec>(m_vertices, g_eps);
-	auto kerpoly_reversed = calc_ker<t_vec>(verts_reversed, g_eps);
+	auto kerpoly = g::calc_ker<t_vec>(m_vertices, g_eps);
+	auto kerpoly_reversed = g::calc_ker<t_vec>(verts_reversed, g_eps);
 
 	// in case the vertices were inserted in reversed order
 	if(kerpoly_reversed.size() > kerpoly.size())

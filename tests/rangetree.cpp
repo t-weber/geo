@@ -14,7 +14,7 @@
 
 using t_real = double;
 using t_vec = m::vec<t_real, std::vector>;
-using t_tree = RangeTree<t_vec>;
+using t_tree = g::RangeTree<t_vec>;
 
 
 int main()

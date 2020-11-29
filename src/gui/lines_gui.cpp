@@ -220,10 +220,10 @@ void LinesScene::UpdateIntersections()
 	switch(m_intersectioncalculationmethod)
 	{
 		case IntersectionCalculationMethod::DIRECT:
-			intersections = intersect_ineff<t_vec, std::pair<t_vec, t_vec>>(m_lines);
+			intersections = g::intersect_ineff<t_vec, std::pair<t_vec, t_vec>>(m_lines);
 			break;
 		case IntersectionCalculationMethod::SWEEP:
-			intersections = intersect_sweep<t_vec, std::pair<t_vec, t_vec>>(m_lines, g_eps);
+			intersections = g::intersect_sweep<t_vec, std::pair<t_vec, t_vec>>(m_lines, g_eps);
 			break;
 		default:
 			QMessageBox::critical(m_parent, "Error", "Unknown intersection calculation method.");
@@ -302,7 +302,7 @@ void LinesScene::UpdateVoro(const QTransform& trafoSceneToVP)
 					}
 					else
 					{
-						col.setRgb(get_rand<int>(0,0xff), get_rand<int>(0,0xff), get_rand<int>(0,0xff));
+						col.setRgb(g::get_rand<int>(0,0xff), g::get_rand<int>(0,0xff), g::get_rand<int>(0,0xff));
 						linecolours.insert(std::make_pair(lineidx, col));
 					}
 

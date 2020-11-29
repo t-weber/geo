@@ -24,8 +24,8 @@ int main()
 	using namespace m_ops;
 
 	std::size_t num_pts = 1000;
-	t_real min = -100;
-	t_real max = 100;
+	t_real min = -t_real(num_pts) * 1e1;
+	t_real max = t_real(num_pts) * 1e1;
 
 	std::cout << "Number of random points to generate: ";
 	std::cin >> num_pts;
@@ -33,13 +33,13 @@ int main()
 	std::vector<t_vec> points;
 	points.reserve(num_pts);
 	for(std::size_t i=0; i<num_pts; ++i)
-		points.emplace_back(m::create<t_vec>({get_rand<t_real>(min, max), get_rand<t_real>(min, max)}));
+		points.emplace_back(m::create<t_vec>({g::get_rand<t_real>(min, max), g::get_rand<t_real>(min, max)}));
 
 
 	{
 		auto starttime = std::chrono::steady_clock::now();
 
-		auto [pt1, pt2, dist] = closest_pair_ineff<t_vec>(points);
+		auto [pt1, pt2, dist] = g::closest_pair_ineff<t_vec>(points);
 		if(pt1[0] > pt2[0])
 			std::swap(pt1, pt2);
 
@@ -57,7 +57,7 @@ int main()
 	{
 		auto starttime = std::chrono::steady_clock::now();
 
-		auto [pt1, pt2, dist] = closest_pair_sweep<t_vec>(points);
+		auto [pt1, pt2, dist] = g::closest_pair_sweep<t_vec>(points);
 		//if(pt1[0] > pt2[0])
 		//	std::swap(pt1, pt2);
 
@@ -72,7 +72,7 @@ int main()
 	{
 		auto starttime = std::chrono::steady_clock::now();
 
-		auto [pt1, pt2, dist] = closest_pair_rtree<2, t_vec>(points);
+		auto [pt1, pt2, dist] = g::closest_pair_rtree<2, t_vec>(points);
 		//if(pt1[0] > pt2[0])
 		//	std::swap(pt1, pt2);
 
@@ -87,7 +87,7 @@ int main()
 	{
 		auto starttime = std::chrono::steady_clock::now();
 
-		auto [pt1, pt2, dist] = closest_pair_rangetree<2, t_vec>(points);
+		auto [pt1, pt2, dist] = g::closest_pair_rangetree<2, t_vec>(points);
 		//if(pt1[0] > pt2[0])
 		//	std::swap(pt1, pt2);
 

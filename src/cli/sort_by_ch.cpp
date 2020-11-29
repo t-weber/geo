@@ -31,14 +31,14 @@ int main()
 	std::cout << "input sequence: ";
 	for(std::size_t i=0; i<num_pts; ++i)
 	{
-		t_real num = get_rand<t_real>(min, max);
+		t_real num = g::get_rand<t_real>(min, max);
 		std::cout << num << " ";
 		vecs.emplace_back(m::create<t_vec>({ num, num*num }));
 	}
 	std::cout << "\n" << std::endl;
 
 
-	auto hull = calc_hull_recursive<t_vec>(vecs);
+	auto hull = g::calc_hull_recursive<t_vec>(vecs);
 
 
 	auto cmp_x = [](const t_vec& vec1, const t_vec& vec2) -> bool
