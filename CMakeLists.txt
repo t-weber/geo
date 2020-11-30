@@ -80,5 +80,9 @@ add_executable(closestpair src/cli/closestpair.cpp)
 target_link_libraries(closestpair ${Boost_LIBRARIES})
 
 
+add_executable(maxsubvec src/cli/maxsubvec.cpp)
+target_link_libraries(maxsubvec ${Boost_LIBRARIES})
+
+
 add_executable(sort_by_ch src/cli/sort_by_ch.cpp)
 target_link_libraries(sort_by_ch ${Boost_LIBRARIES})

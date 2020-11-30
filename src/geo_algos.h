@@ -2237,7 +2237,8 @@ requires m::is_iterable<t_arr> && m::is_basic_vec<t_arr>
 // ----------------------------------------------------------------------------
 // closest pair
 // Reference: "Algorithmische Geometrie" (2005), ISBN: 978-3540209560,
-//	Ch. 2.2.2, pp. 53f; Ch. 2.3.1, pp. 57f; Ch. 2.4.1, pp. 93f ----------------------------------------------------------------------------
+//	Ch. 2.2.2, pp. 53f; Ch. 2.3.1, pp. 57f; Ch. 2.4.1, pp. 93f
+// ----------------------------------------------------------------------------
 
 template<class t_vec, class t_real = typename t_vec::value_type>
 std::tuple<const t_vec*, const t_vec*, t_real>

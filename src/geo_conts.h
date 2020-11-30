@@ -30,17 +30,17 @@
  * 	4: splay tree
  */
 #ifndef __RANGE_TREE_UNDERLYING_IMPL
-#define __RANGE_TREE_UNDERLYING_IMPL 2
+	#define __RANGE_TREE_UNDERLYING_IMPL 2
 #endif
 
 #if __RANGE_TREE_UNDERLYING_IMPL==1
-#include <boost/intrusive/bstree_algorithms.hpp>
+	#include <boost/intrusive/bstree_algorithms.hpp>
 #elif __RANGE_TREE_UNDERLYING_IMPL==2
-#include <boost/intrusive/avltree_algorithms.hpp>
+	#include <boost/intrusive/avltree_algorithms.hpp>
 #elif __RANGE_TREE_UNDERLYING_IMPL==3
-#include <boost/intrusive/rbtree_algorithms.hpp>
+	#include <boost/intrusive/rbtree_algorithms.hpp>
 #elif __RANGE_TREE_UNDERLYING_IMPL==4
-#include <boost/intrusive/splaytree_algorithms.hpp>
+	#include <boost/intrusive/splaytree_algorithms.hpp>
 #endif
 
 #include <boost/intrusive/treap_algorithms.hpp>

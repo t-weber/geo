@@ -13,7 +13,7 @@
 #include <type_traits>
 #include <cstdint>
 
-#include "../src/geo_algos.h"
+#include "geo_algos.h"
 
 //#define DO_TEST
 
@@ -33,12 +33,12 @@ int main()
 		std::array<t_num, N> deltas;
 		std::generate(deltas.begin(), deltas.end(), []() -> t_num
 		{
-			return get_rand<t_num>();
+			return g::get_rand<t_num>();
 		});
 
 
-		auto tup1 = subvec_ineffic<t_largernum>(deltas);
-		auto tup2 = subvec_sweep<t_largernum>(deltas);
+		auto tup1 = g::subvec_ineffic<t_largernum>(deltas);
+		auto tup2 = g::subvec_sweep<t_largernum>(deltas);
 
 		if(tup1 == tup2)
 		{
@@ -69,7 +69,7 @@ int main()
 	std::array<t_num, N> deltas;
 	std::generate(deltas.begin(), deltas.end(), []() -> t_num
 	{
-		return get_rand<t_num>();
+		return g::get_rand<t_num>();
 	});
 
 
@@ -79,12 +79,12 @@ int main()
 
 
 	{
-		auto [start_idx, end_idx, maxval] = subvec_ineffic<t_largernum>(deltas);
+		auto [start_idx, end_idx, maxval] = g::subvec_ineffic<t_largernum>(deltas);
 		std::cout << "Max. subvec range: [" << start_idx << ", " << end_idx << "[, sum: " << +maxval << std::endl;
 	}
 
 	{
-		auto [start_idx, end_idx, maxval] = subvec_sweep<t_largernum>(deltas);
+		auto [start_idx, end_idx, maxval] = g::subvec_sweep<t_largernum>(deltas);
 		std::cout << "Max. subvec range: [" << start_idx << ", " << end_idx << "[, sum: " << +maxval << std::endl;
 	}
 
