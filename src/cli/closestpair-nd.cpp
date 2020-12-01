@@ -1,0 +1,97 @@
+/**
+ * closest pair
+ * @author Tobias Weber (orcid: 0000-0002-7230-1932)
+ * @date 4-oct-20
+ * @license see 'LICENSE' file
+ *
+ * References:
+ *	- http://dx.doi.org/10.1007/3-540-27619-X, ch 2.3.1, p. 57
+ *	- https://en.wikipedia.org/wiki/Closest_pair_of_points_problem
+ */
+
+
+#include <chrono>
+#include "geo_algos.h"
+
+
+using t_real = /*long*/ double;
+using t_vec = m::vec<t_real, std::vector>;
+using t_mat = m::mat<t_real, std::vector>;
+
+
+int main()
+{
+	using namespace m_ops;
+
+	std::size_t num_pts = 1000;
+	std::cout << "Number of random points to generate: ";
+	std::cin >> num_pts;
+
+	const constexpr std::size_t dim = 3;
+	//std::cout << "Number of dimensions: ";
+	//std::cin >> dim;
+
+	t_real min = -t_real(num_pts) * 1e1;
+	t_real max = t_real(num_pts) * 1e1;
+
+
+	std::vector<t_vec> points;
+	points.reserve(num_pts);
+	for(std::size_t i=0; i<num_pts; ++i)
+	{
+		t_vec pt = m::create<t_vec>(dim);
+		for(std::size_t d=0; d<dim; ++d)
+			pt[d] = g::get_rand<t_real>(min, max);
+		points.emplace_back(std::move(pt));
+	}
+
+
+	{
+		auto starttime = std::chrono::steady_clock::now();
+
+		auto [pt1, pt2, dist] = g::closest_pair_ineff<t_vec>(points);
+		if(pt1[0] > pt2[0])
+			std::swap(pt1, pt2);
+
+		auto stoptime = std::chrono::steady_clock::now();
+		auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(stoptime - starttime);
+
+		if(pt1 && pt2)
+		{
+			std::cout << "Closest pair (ineff): point 1: " << *pt1 << ", point 2: " << *pt2
+				<< ", dist: " << dist << ", time: " << elapsed.count() << " ms" << std::endl;
+		}
+	}
+
+
+	{
+		auto starttime = std::chrono::steady_clock::now();
+
+		auto [pt1, pt2, dist] = g::closest_pair_rtree<2, t_vec>(points);
+		//if(pt1[0] > pt2[0])
+		//	std::swap(pt1, pt2);
+
+		auto stoptime = std::chrono::steady_clock::now();
+		auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(stoptime - starttime);
+
+		std::cout << "Closest pair (rtree): point 1: " << pt1 << ", point 2: " << pt2
+			<< ", dist: " << dist  << ", time: " << elapsed.count() << " ms" << std::endl;
+	}
+
+
+	{
+		auto starttime = std::chrono::steady_clock::now();
+
+		auto [pt1, pt2, dist] = g::closest_pair_rangetree<dim, t_vec>(points);
+		//if(pt1[0] > pt2[0])
+		//	std::swap(pt1, pt2);
+
+		auto stoptime = std::chrono::steady_clock::now();
+		auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(stoptime - starttime);
+
+		std::cout << "Closest pair (range): point 1: " << pt1 << ", point 2: " << pt2
+			<< ", dist: " << dist  << ", time: " << elapsed.count() << " ms" << std::endl;
+	}
+
+	return 0;
+}
