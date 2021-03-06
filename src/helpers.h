@@ -2,7 +2,7 @@
  * helpers
  * @author Tobias Weber (orcid: 0000-0002-7230-1932)
  * @date oct-20
- * @license: see 'LICENSE.GPL' file
+ * @license: see 'LICENSE' file
  */
 
 #ifndef __GEO_HELPERS__
