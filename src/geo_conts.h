@@ -5,7 +5,8 @@
  * @license: see 'LICENSE' file
  *
  * References:
- *	- "Algorithmische Geometrie" (2005), ISBN: 978-3540209560 (http://dx.doi.org/10.1007/3-540-27619-X), Ch. 3.3.2, pp. 135f (range tree)
+ *	- "Algorithmische Geometrie" (2005), ISBN: 978-3540209560 (http://dx.doi.org/10.1007/3-540-27619-X), Ch. 3.3.2, pp. 135f (range tree).
+ *	- "Computational Geometry" (2008), ISBN: 978-3-642-09681-5 (http://dx.doi.org/10.1007/978-3-540-77974-2).
  *	- https://www.boost.org/doc/libs/1_74_0/doc/html/intrusive/node_algorithms.html
  */
 

@@ -6,6 +6,7 @@
  *
  * Reference for the algorithms:
  *	- "Algorithmische Geometrie" (2005), ISBN: 978-3540209560 (http://dx.doi.org/10.1007/3-540-27619-X).
+ *	- "Computational Geometry" (2008), ISBN: 978-3-642-09681-5 (http://dx.doi.org/10.1007/978-3-540-77974-2).
  */
 
 #ifndef __GEO2D_ALGOS_H__
@@ -214,7 +215,7 @@ requires m::is_vec<t_vec>
 	using t_mat = m::mat<t_real, std::vector>;
 
 	t_mat trafo = m::create<t_mat, t_vec>({tri1-tri3, tri2-tri3});
-	auto [inv_trafo, ok] = m::inv<t_mat>(trafo);
+	auto [inv_trafo, ok] = m::inv<t_mat, t_vec>(trafo);
 	if(!ok)
 		return std::nullopt;
 
