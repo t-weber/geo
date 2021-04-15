@@ -3,7 +3,7 @@
  * @date nov-2020
  * @license see 'LICENSE' file
  *
- * g++ -std=c++20 -o tst3 tst3.cpp
+ * g++ -std=c++20 -Wall -Wextra -Weffc++ -o tst3 tst3.cpp
  */
 
 
@@ -24,6 +24,10 @@ int main()
 		{ m::create<t_vec>({-5, 0}), m::create<t_vec>({5, 0}) },
 		{ m::create<t_vec>({-10, 0}), m::create<t_vec>({10, 0}) },
 	};
+
+	g::TrapezoidNodePoint<t_vec> tp;
+	g::TrapezoidNodeLine<t_vec> tl;
+	g::TrapezoidNodeTrapezoid<t_vec> tt;
 
 	return 0;
 }

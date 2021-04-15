@@ -2508,7 +2508,151 @@ requires m::is_vec<t_vec>
 	return std::make_tuple(*pt1, *pt2, dist);
 }
 
+// ----------------------------------------------------------------------------
+
+
 
 // ----------------------------------------------------------------------------
+// trapezoid map
+// Reference: "Computational Geometry" (2008), ISBN: 978-3-642-09681-5
+//            (http://dx.doi.org/10.1007/978-3-540-77974-2),
+//            Ch. 6.2, pp. 128-133.
+// ----------------------------------------------------------------------------
+
+enum class TrapezoidNodeType
+{
+	POINT,
+	LINE,
+	TRAPEZOID,
+};
+
+
+template<class t_vec>
+requires m::is_vec<t_vec>
+class TrapezoidNode
+{
+public:
+	TrapezoidNode() : m_left{}, m_right{}
+	{}
+	TrapezoidNode(
+		const std::shared_ptr<TrapezoidNode<t_vec>>& left,
+		const std::shared_ptr<TrapezoidNode<t_vec>>& right)
+		: m_left{left}, m_right{right}
+	{}
+
+	virtual ~TrapezoidNode() = default;
+
+	virtual TrapezoidNodeType GetType() const = 0;
+	virtual bool IsLeft(const t_vec& vec) const = 0;
+
+	std::shared_ptr<TrapezoidNode> GetLeft() { return m_left; }
+	std::shared_ptr<TrapezoidNode> GetRight() { return m_right; }
+
+	const std::shared_ptr<TrapezoidNode> GetLeft() const { return m_left; }
+	const std::shared_ptr<TrapezoidNode> GetRight() const { return m_right; }
+
+	void SetLeft(const std::shared_ptr<TrapezoidNode>& left) { m_left = left; }
+	void SetRight(const std::shared_ptr<TrapezoidNode>& right) { m_right = right; }
+
+private:
+	std::shared_ptr<TrapezoidNode> m_left, m_right;
+};
+
+
+template<class t_vec>
+requires m::is_vec<t_vec>
+class TrapezoidNodePoint : public TrapezoidNode<t_vec>
+{
+public:
+	TrapezoidNodePoint(const t_vec& vec = m::zero<t_vec>())
+		: TrapezoidNode<t_vec>{}, m_vec{vec}
+	{}
+
+	TrapezoidNodePoint(
+		const std::shared_ptr<TrapezoidNode<t_vec>>& left,
+		const std::shared_ptr<TrapezoidNode<t_vec>>& right)
+		: TrapezoidNode<t_vec>{left, right}
+	{}
+
+	virtual ~TrapezoidNodePoint() = default;
+
+	virtual TrapezoidNodeType GetType() const override
+	{
+		return TrapezoidNodeType::POINT;
+	}
+
+	virtual bool IsLeft(const t_vec& vec) const override
+	{
+		// is vec left of m_vec?
+		return vec[0] <= m_vec[0];
+	}
+
+private:
+	t_vec m_vec;
+};
+
+
+template<class t_vec>
+requires m::is_vec<t_vec>
+class TrapezoidNodeLine : public TrapezoidNode<t_vec>
+{
+public:
+	using t_real = typename t_vec::value_type;
+
+public:
+	TrapezoidNodeLine(const std::pair<t_vec, t_vec>& line
+		= std::make_pair<t_vec, t_vec>(m::zero<t_vec>(), m::zero<t_vec>()))
+		: TrapezoidNode<t_vec>{}, m_line{line}
+	{}
+
+	TrapezoidNodeLine(
+		const std::shared_ptr<TrapezoidNode<t_vec>>& left,
+		const std::shared_ptr<TrapezoidNode<t_vec>>& right)
+		: TrapezoidNode<t_vec>{left, right}
+	{}
+
+	virtual ~TrapezoidNodeLine() = default;
+
+	virtual TrapezoidNodeType GetType() const override
+	{
+		return TrapezoidNodeType::LINE;
+	}
+
+	virtual bool IsLeft(const t_vec& vec) const override
+	{
+		// is vec left of m_line?
+		return side_of_line<t_vec, t_real>(
+			std::get<0>(m_line), std::get<1>(m_line), vec) >= t_real(0);
+	}
+
+private:
+	std::pair<t_vec, t_vec> m_line;
+};
+
+
+template<class t_vec>
+requires m::is_vec<t_vec>
+class TrapezoidNodeTrapezoid : public TrapezoidNode<t_vec>
+{
+public:
+	TrapezoidNodeTrapezoid() = default;
+	virtual ~TrapezoidNodeTrapezoid() = default;
+
+	virtual TrapezoidNodeType GetType() const override
+	{
+		return TrapezoidNodeType::TRAPEZOID;
+	}
+
+protected:
+	virtual bool IsLeft(const t_vec&) const override
+	{
+		return false;
+	}
+
+private:
+};
+
+// ----------------------------------------------------------------------------
+
 }
 #endif
