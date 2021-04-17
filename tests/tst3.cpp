@@ -23,9 +23,10 @@ int main()
 	{
 		{ m::create<t_vec>({-5, 0}), m::create<t_vec>({5, 0}) },
 		{ m::create<t_vec>({-10, 1}), m::create<t_vec>({10, 1}) },
+		{ m::create<t_vec>({-2.5, 0.5}), m::create<t_vec>({2.5, 0.5}) },
 	};
 
-	auto node = g::create_trapezoidmap<t_vec>(lines);
+	auto node = g::create_trapezoid_tree<t_vec>(lines);
 	std::cout << std::make_pair(node, 0) << std::endl;
 
 	return 0;
