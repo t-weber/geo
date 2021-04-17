@@ -2572,12 +2572,12 @@ public:
 
 		// is point left of top line?
 		if(side_of_line<t_vec, t_real>(
-			std::get<0>(*m_lineTop), std::get<1>(*m_lineTop), pt) > t_real(0))
+			std::get<0>(m_lineTop), std::get<1>(m_lineTop), pt) > t_real(0))
 			return false;
 
 		// is point right of bottom line?
 		if(side_of_line<t_vec, t_real>(
-			std::get<0>(*m_lineBottom), std::get<1>(*m_lineBottom), pt) < t_real(0))
+			std::get<0>(m_lineBottom), std::get<1>(m_lineBottom), pt) < t_real(0))
 			return false;
 
 		return true;
@@ -2919,6 +2919,154 @@ std::ostream& operator<<(std::ostream& ostr,
 
 
 /**
+ * are two lines equals
+ * TODO: don't test literal equality, but rather offset and slope equality
+ */
+template<class t_vec, class t_real=typename t_vec::value_type>
+requires m::is_vec<t_vec>
+bool is_line_equal(
+	const std::pair<t_vec, t_vec>& line1,
+	const std::pair<t_vec, t_vec>& line2,
+	t_real eps=std::numeric_limits<t_real>::epsilon())
+{
+	if(!m::equals<t_vec>(std::get<0>(line1), std::get<0>(line2), eps))
+		return false;
+	if(!m::equals<t_vec>(std::get<1>(line1), std::get<1>(line2), eps))
+		return false;
+	return true;
+}
+
+
+/**
+ * find a neighbouring trapezoid in the tree
+ */
+template<class t_vec, class t_real=typename t_vec::value_type>
+requires m::is_vec<t_vec>
+std::shared_ptr<Trapezoid<t_vec>> find_neighbour_trapezoid(
+	const std::shared_ptr<TrapezoidNode<t_vec>>& node,
+	const std::shared_ptr<Trapezoid<t_vec>>& trap,
+	bool left=1, bool top=1,
+	t_real eps=std::numeric_limits<t_real>::epsilon())
+{
+	const std::pair<t_vec, t_vec>* lineTop = &trap->GetTopLine();
+	const std::pair<t_vec, t_vec>* lineBottom = &trap->GetBottomLine();
+	const t_vec* ptLeft = &trap->GetLeftPoint();
+	const t_vec* ptRight = &trap->GetRightPoint();
+
+	// possible neighbours
+	std::vector<std::shared_ptr<Trapezoid<t_vec>>> candidates;
+
+	// function to traverse the tree
+	std::function<void(const std::shared_ptr<TrapezoidNode<t_vec>>&)> traverse;
+	traverse = [&candidates, &traverse, lineTop, lineBottom, ptLeft, ptRight, left, top, eps]
+		(const std::shared_ptr<TrapezoidNode<t_vec>>& node) -> void
+	{
+		// TODO: better use of binary search tree, no need to check all nodes...
+		if(node->GetLeft())
+			traverse(node->GetLeft());
+		if(node->GetRight())
+			traverse(node->GetRight());
+
+		if(node->GetType() == TrapezoidNodeType::TRAPEZOID)
+		{
+			auto trnode = std::dynamic_pointer_cast<const TrapezoidNodeTrapezoid<t_vec>>(node);
+			const std::pair<t_vec, t_vec>& lineTop2 = trnode->GetTrapezoid()->GetTopLine();
+			const std::pair<t_vec, t_vec>& lineBottom2 = trnode->GetTrapezoid()->GetBottomLine();
+			const t_vec& ptLeft2 = trnode->GetTrapezoid()->GetLeftPoint();
+			const t_vec& ptRight2 = trnode->GetTrapezoid()->GetRightPoint();
+
+			if(left && top)
+			{
+				if(is_line_equal<t_vec>(*lineTop, lineTop2, eps)
+					&& m::equals<t_vec>(*ptLeft, ptRight2, eps))
+					candidates.push_back(trnode->GetTrapezoid());
+			}
+			else if(left && !top)
+			{
+				if(is_line_equal<t_vec>(*lineBottom, lineBottom2, eps)
+					&& m::equals<t_vec>(*ptLeft, ptRight2, eps))
+					candidates.push_back(trnode->GetTrapezoid());
+			}
+			else if(!left && top)
+			{
+				if(is_line_equal<t_vec>(*lineTop, lineTop2, eps)
+					&& m::equals<t_vec>(*ptRight, ptLeft2, eps))
+					candidates.push_back(trnode->GetTrapezoid());
+			}
+			else if(!left && !top)
+			{
+				if(is_line_equal<t_vec>(*lineBottom, lineBottom2, eps)
+					&& m::equals<t_vec>(*ptRight, ptLeft2, eps))
+					candidates.push_back(trnode->GetTrapezoid());
+			}
+		}
+	};
+
+	// search the tree
+	traverse(node);
+
+	// no neighbours found
+	if(candidates.size() == 0)
+		return nullptr;
+
+	if(candidates.size() > 1)
+	{
+		std::cerr << __PRETTY_FUNCTION__
+			<< ": Warning: more than one neighbour found." << std::endl;
+	}
+
+	return candidates[0];
+}
+
+
+/**
+ * find trapezoid containing a given point
+ */
+template<class t_vec, class t_real=typename t_vec::value_type>
+requires m::is_vec<t_vec>
+std::shared_ptr<Trapezoid<t_vec>> find_trapezoid(
+	const std::shared_ptr<TrapezoidNode<t_vec>>& node, const t_vec& pt)
+{
+	// possible trapezoids
+	std::vector<std::shared_ptr<Trapezoid<t_vec>>> candidates;
+
+	// function to traverse the tree
+	std::function<void(const std::shared_ptr<TrapezoidNode<t_vec>>&)> traverse;
+	traverse = [&candidates, &pt, &traverse]
+		(const std::shared_ptr<TrapezoidNode<t_vec>>& node) -> void
+	{
+		// TODO: better use of binary search tree, no need to check all nodes...
+		if(node->GetLeft())
+			traverse(node->GetLeft());
+		if(node->GetRight())
+			traverse(node->GetRight());
+
+		if(node->GetType() == TrapezoidNodeType::TRAPEZOID)
+		{
+			auto trnode = std::dynamic_pointer_cast<const TrapezoidNodeTrapezoid<t_vec>>(node);
+			if(trnode->GetTrapezoid()->Contains(pt))
+				candidates.push_back(trnode->GetTrapezoid());
+		}
+	};
+
+	// search the tree
+	traverse(node);
+
+	// no neighbours found
+	if(candidates.size() == 0)
+		return nullptr;
+
+	if(candidates.size() > 1)
+	{
+		std::cerr << __PRETTY_FUNCTION__
+			<< ": Warning: more than one trapezoid found." << std::endl;
+	}
+
+	return candidates[0];
+}
+
+
+/**
  * create a trapezoid map
  * @see (Berg 2008), pp. 128-130
  */
@@ -2936,7 +3084,16 @@ create_trapezoidmap(const std::vector<std::pair<t_vec, t_vec>>& lines)
 
 	for(const auto& line : randlines)
 	{
+		std::vector<std::shared_ptr<Trapezoid<t_vec>>> intersecting_trapezoids;
+
+		const t_vec& leftpt = std::get<0>(line);
+		const t_vec& rightpt = std::get<1>(line);
+
+		if(auto trap = find_trapezoid<t_vec>(node, leftpt); trap)
+			intersecting_trapezoids.push_back(trap);
+
 		// TODO
+		//find_neighbour_trapezoid<t_vec>(node, node->GetTrapezoid());
 	}
 
 	return node;
