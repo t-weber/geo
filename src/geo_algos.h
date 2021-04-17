@@ -6,7 +6,7 @@
  *
  * Reference for the algorithms:
  *	- "Algorithmische Geometrie" (2005), ISBN: 978-3540209560 (http://dx.doi.org/10.1007/3-540-27619-X).
- *	- "Computational Geometry" (2008), ISBN: 978-3-642-09681-5 (http://dx.doi.org/10.1007/978-3-540-77974-2).
+ *	- (Berg 2008) "Computational Geometry" (2008), ISBN: 978-3-642-09681-5 (http://dx.doi.org/10.1007/978-3-540-77974-2).
  */
 
 #ifndef __GEO2D_ALGOS_H__
@@ -2514,10 +2514,125 @@ requires m::is_vec<t_vec>
 
 // ----------------------------------------------------------------------------
 // trapezoid map
-// Reference: "Computational Geometry" (2008), ISBN: 978-3-642-09681-5
-//            (http://dx.doi.org/10.1007/978-3-540-77974-2),
-//            Ch. 6.2, pp. 128-133.
+// Reference: (Berg 2008), ch. 6.2, pp. 128-133.
 // ----------------------------------------------------------------------------
+
+/**
+ * trapezoid defined by a top and bottom line as well as a left and right point
+ */
+template<class t_vec> requires m::is_vec<t_vec>
+class Trapezoid
+{
+public:
+	using t_real = typename t_vec::value_type;
+
+
+public:
+	Trapezoid() = default;
+	~Trapezoid() = default;
+
+	const t_vec& GetLeftPoint() const { return m_pointLeft; }
+	const t_vec& GetRightPoint() const { return m_pointRight; }
+
+	const std::pair<t_vec, t_vec>& GetTopLine() const { return m_lineTop; }
+	const std::pair<t_vec, t_vec>& GetBottomLine() const { return m_lineBottom; }
+
+	void SetLeftPoint(const t_vec& pt) { m_pointLeft = pt; }
+	void SetRightPoint(const t_vec& pt) { m_pointRight = pt; }
+
+
+	void SetTopLine(const std::pair<t_vec, t_vec>& line)
+	{
+		m_lineTop = line;
+
+		// x component of line vertex 1 has to be left of vertex 2
+		if(std::get<0>(m_lineTop)[0] > std::get<1>(m_lineTop)[0])
+			std::swap(std::get<0>(m_lineTop), std::get<1>(m_lineTop));
+	}
+
+
+	void SetBottomLine(const std::pair<t_vec, t_vec>& line)
+	{
+		m_lineBottom = line;
+
+		// x component of line vertex 1 has to be left of vertex 2
+		if(std::get<0>(m_lineBottom)[0] > std::get<1>(m_lineBottom)[0])
+			std::swap(std::get<0>(m_lineBottom), std::get<1>(m_lineBottom));
+	}
+
+
+	/**
+	 * is point inside trapezoid?
+	 */
+	bool Contains(const t_vec& pt) const
+	{
+		// is point x left of left point x or right of right point x
+		if(pt[0] < m_pointLeft[0] || pt[0] > m_pointRight[0])
+			return false;
+
+		// is point left of top line?
+		if(side_of_line<t_vec, t_real>(
+			std::get<0>(*m_lineTop), std::get<1>(*m_lineTop), pt) > t_real(0))
+			return false;
+
+		// is point right of bottom line?
+		if(side_of_line<t_vec, t_real>(
+			std::get<0>(*m_lineBottom), std::get<1>(*m_lineBottom), pt) < t_real(0))
+			return false;
+
+		return true;
+	}
+
+
+	/**
+	 * let the trapezoid be the bounding box of the given points
+	 */
+	void SetBoundingBox(const std::vector<t_vec>& pts)
+	{
+		t_real xmin = std::numeric_limits<t_real>::max();
+		t_real xmax = -xmin;
+		t_real ymin = xmin;
+		t_real ymax = -ymin;
+
+		for(const t_vec& pt : pts)
+		{
+			xmin = std::min(xmin, pt[0]);
+			xmax = std::max(xmax, pt[0]);
+			ymin = std::min(ymin, pt[1]);
+			ymax = std::max(ymax, pt[1]);
+		}
+
+		m_pointLeft = m::create<t_vec>({xmin, ymin});
+		m_pointRight = m::create<t_vec>({xmax, ymax});
+
+		m_lineBottom = std::make_pair(m::create<t_vec>({xmin, ymin}), m::create<t_vec>({xmax, ymin}));
+		m_lineTop = std::make_pair(m::create<t_vec>({xmin, ymax}), m::create<t_vec>({xmax, ymax}));
+	}
+
+
+	/**
+	 * let the trapezoid be the bounding box of the given line segments
+	 */
+	void SetBoundingBox(const std::vector<std::pair<t_vec, t_vec>>& lines)
+	{
+		std::vector<t_vec> pts;
+		pts.reserve(lines.size()*2);
+
+		for(const auto& line : lines)
+		{
+			pts.push_back(std::get<0>(line));
+			pts.push_back(std::get<1>(line));
+		}
+
+		SetBoundingBox(pts);
+	}
+
+
+private:
+	t_vec m_pointLeft{}, m_pointRight{};
+	std::pair<t_vec, t_vec> m_lineTop{}, m_lineBottom{};
+};
+
 
 enum class TrapezoidNodeType
 {
@@ -2527,54 +2642,58 @@ enum class TrapezoidNodeType
 };
 
 
-template<class t_vec>
-requires m::is_vec<t_vec>
+template<class t_vec> requires m::is_vec<t_vec>
 class TrapezoidNode
 {
 public:
-	TrapezoidNode() : m_left{}, m_right{}
-	{}
-	TrapezoidNode(
-		const std::shared_ptr<TrapezoidNode<t_vec>>& left,
-		const std::shared_ptr<TrapezoidNode<t_vec>>& right)
-		: m_left{left}, m_right{right}
-	{}
-
+	TrapezoidNode() = default;
 	virtual ~TrapezoidNode() = default;
 
 	virtual TrapezoidNodeType GetType() const = 0;
 	virtual bool IsLeft(const t_vec& vec) const = 0;
 
-	std::shared_ptr<TrapezoidNode> GetLeft() { return m_left; }
-	std::shared_ptr<TrapezoidNode> GetRight() { return m_right; }
+	virtual const std::shared_ptr<TrapezoidNode<t_vec>> GetLeft() const = 0;
+	virtual const std::shared_ptr<TrapezoidNode<t_vec>> GetRight() const = 0;
 
-	const std::shared_ptr<TrapezoidNode> GetLeft() const { return m_left; }
-	const std::shared_ptr<TrapezoidNode> GetRight() const { return m_right; }
-
-	void SetLeft(const std::shared_ptr<TrapezoidNode>& left) { m_left = left; }
-	void SetRight(const std::shared_ptr<TrapezoidNode>& right) { m_right = right; }
-
-private:
-	std::shared_ptr<TrapezoidNode> m_left, m_right;
+	virtual void SetLeft(const std::shared_ptr<TrapezoidNode<t_vec>>& left) = 0;
+	virtual void SetRight(const std::shared_ptr<TrapezoidNode<t_vec>>& right) = 0;
 };
 
 
-template<class t_vec>
-requires m::is_vec<t_vec>
+template<class t_vec> requires m::is_vec<t_vec>
 class TrapezoidNodePoint : public TrapezoidNode<t_vec>
 {
 public:
-	TrapezoidNodePoint(const t_vec& vec = m::zero<t_vec>())
-		: TrapezoidNode<t_vec>{}, m_vec{vec}
+	TrapezoidNodePoint(const t_vec& vec = m::zero<t_vec>()) : m_vec{vec}
 	{}
 
 	TrapezoidNodePoint(
 		const std::shared_ptr<TrapezoidNode<t_vec>>& left,
 		const std::shared_ptr<TrapezoidNode<t_vec>>& right)
-		: TrapezoidNode<t_vec>{left, right}
+		: m_left{left}, m_right{right}
 	{}
 
 	virtual ~TrapezoidNodePoint() = default;
+
+	virtual const std::shared_ptr<TrapezoidNode<t_vec>> GetLeft() const override
+	{
+		return m_left;
+	}
+
+	virtual const std::shared_ptr<TrapezoidNode<t_vec>> GetRight() const override
+	{
+		return m_right;
+	}
+
+	virtual void SetLeft(const std::shared_ptr<TrapezoidNode<t_vec>>& left) override
+	{
+		m_left = left;
+	}
+
+	virtual void SetRight(const std::shared_ptr<TrapezoidNode<t_vec>>& right) override
+	{
+		m_right = right;
+	}
 
 	virtual TrapezoidNodeType GetType() const override
 	{
@@ -2587,31 +2706,57 @@ public:
 		return vec[0] <= m_vec[0];
 	}
 
+
+	const t_vec& GetPoint() const { return m_vec; }
+
+
 private:
-	t_vec m_vec;
+	std::shared_ptr<TrapezoidNode<t_vec>> m_left{}, m_right{};
+	t_vec m_vec{};
 };
 
 
-template<class t_vec>
-requires m::is_vec<t_vec>
+template<class t_vec> requires m::is_vec<t_vec>
 class TrapezoidNodeLine : public TrapezoidNode<t_vec>
 {
 public:
 	using t_real = typename t_vec::value_type;
 
+
 public:
 	TrapezoidNodeLine(const std::pair<t_vec, t_vec>& line
 		= std::make_pair<t_vec, t_vec>(m::zero<t_vec>(), m::zero<t_vec>()))
-		: TrapezoidNode<t_vec>{}, m_line{line}
+		: m_line{line}
 	{}
 
 	TrapezoidNodeLine(
 		const std::shared_ptr<TrapezoidNode<t_vec>>& left,
 		const std::shared_ptr<TrapezoidNode<t_vec>>& right)
-		: TrapezoidNode<t_vec>{left, right}
+		: m_left{left}, m_right{right}
 	{}
 
 	virtual ~TrapezoidNodeLine() = default;
+
+
+	virtual const std::shared_ptr<TrapezoidNode<t_vec>> GetLeft() const override
+	{
+		return m_left;
+	}
+
+	virtual const std::shared_ptr<TrapezoidNode<t_vec>> GetRight() const override
+	{
+		return m_right;
+	}
+
+	virtual void SetLeft(const std::shared_ptr<TrapezoidNode<t_vec>>& left) override
+	{
+		m_left = left;
+	}
+
+	virtual void SetRight(const std::shared_ptr<TrapezoidNode<t_vec>>& right) override
+	{
+		m_right = right;
+	}
 
 	virtual TrapezoidNodeType GetType() const override
 	{
@@ -2625,17 +2770,25 @@ public:
 			std::get<0>(m_line), std::get<1>(m_line), vec) >= t_real(0);
 	}
 
+
+	const std::pair<t_vec, t_vec>& GetLine() const { return m_line; }
+
+
 private:
-	std::pair<t_vec, t_vec> m_line;
+	std::shared_ptr<TrapezoidNode<t_vec>> m_left{}, m_right{};
+	std::pair<t_vec, t_vec> m_line{};
 };
 
 
-template<class t_vec>
-requires m::is_vec<t_vec>
+template<class t_vec> requires m::is_vec<t_vec>
 class TrapezoidNodeTrapezoid : public TrapezoidNode<t_vec>
 {
 public:
-	TrapezoidNodeTrapezoid() = default;
+	TrapezoidNodeTrapezoid(const std::shared_ptr<Trapezoid<t_vec>>& trapezoid = nullptr)
+		: m_trapezoid{trapezoid}
+	{
+	}
+
 	virtual ~TrapezoidNodeTrapezoid() = default;
 
 	virtual TrapezoidNodeType GetType() const override
@@ -2643,15 +2796,151 @@ public:
 		return TrapezoidNodeType::TRAPEZOID;
 	}
 
-protected:
-	virtual bool IsLeft(const t_vec&) const override
+
+	const std::shared_ptr<Trapezoid<t_vec>> GetTrapezoid() const
 	{
-		return false;
+		return m_trapezoid;
 	}
 
+	void SetTrapezoid(const std::shared_ptr<Trapezoid<t_vec>>& trapezoid)
+	{
+		return m_trapezoid = trapezoid;
+	}
+
+
+protected:
+	virtual const std::shared_ptr<TrapezoidNode<t_vec>> GetLeft() const override
+	{ return nullptr; }
+
+	virtual const std::shared_ptr<TrapezoidNode<t_vec>> GetRight() const override
+	{ return nullptr; }
+
+	virtual void SetLeft(const std::shared_ptr<TrapezoidNode<t_vec>>&) override
+	{ }
+
+	virtual void SetRight(const std::shared_ptr<TrapezoidNode<t_vec>>&) override
+	{ }
+
+	virtual bool IsLeft(const t_vec&) const override
+	{ return false; }
+
+
 private:
+	std::shared_ptr<Trapezoid<t_vec>> m_trapezoid{};
 };
 
+
+template<class t_vec> requires m::is_vec<t_vec>
+std::ostream& operator<<(std::ostream& ostr,
+	const std::pair<std::shared_ptr<TrapezoidNode<t_vec>>, int>& node_depth)
+{
+	const auto& node = *std::get<0>(node_depth);
+	int depth = std::get<1>(node_depth);
+
+	auto print_pt = [&ostr](const t_vec& pt) -> void
+	{
+		ostr << "(" << pt[0] << ", " << pt[1] << ")";
+	};
+
+	auto print_line = [&ostr](const std::pair<t_vec, t_vec>& line) -> void
+	{
+		const auto& pt0 = std::get<0>(line);
+		const auto& pt1 = std::get<1>(line);
+
+		ostr << "(" << pt0[0] << ", " << pt0[1] << "), ("
+			<< pt1[0] << ", " << pt1[1] << ")";
+	};
+
+	auto print_indent = [&ostr, depth]() -> void
+	{
+		for(int i=0; i<depth; ++i)
+			ostr << "  ";
+	};
+
+	print_indent();
+
+	switch(node.GetType())
+	{
+		case TrapezoidNodeType::POINT:
+		{
+			auto ptnode = dynamic_cast<const TrapezoidNodePoint<t_vec>&>(node);
+			const auto& pt = ptnode.GetPoint();
+			ostr << "point: ";
+			print_pt(pt);
+
+			break;
+		}
+
+		case TrapezoidNodeType::LINE:
+		{
+			auto linenode = dynamic_cast<const TrapezoidNodeLine<t_vec>&>(node);
+			const auto& line = linenode.GetLine();
+			ostr << "line: ";
+			print_line(line);
+
+			break;
+		}
+
+		case TrapezoidNodeType::TRAPEZOID:
+		{
+			auto trnode = dynamic_cast<const TrapezoidNodeTrapezoid<t_vec>&>(node);
+
+			ostr << "trapezoid: ";
+			ostr << "left: ";
+			print_pt(trnode.GetTrapezoid()->GetLeftPoint());
+			ostr << ", right: ";
+			print_pt(trnode.GetTrapezoid()->GetRightPoint());
+			ostr << ", bottom: ";
+			print_line(trnode.GetTrapezoid()->GetBottomLine());
+			ostr << ", top: ";
+			print_line(trnode.GetTrapezoid()->GetTopLine());
+
+			break;
+		}
+	};
+
+	ostr << "\n";
+
+	if(node.GetLeft())
+	{
+		print_indent();
+		ostr << "left node: ";
+		ostr << std::make_pair(node.GetLeft(), depth+1);
+	}
+	if(node.GetRight())
+	{
+		print_indent();
+		ostr << "right node: ";
+		ostr << std::make_pair(node.GetRight(), depth+1);
+	}
+
+	return ostr;
+}
+
+
+/**
+ * create a trapezoid map
+ * @see (Berg 2008), pp. 128-130
+ */
+template<class t_vec> requires m::is_vec<t_vec>
+std::shared_ptr<TrapezoidNode<t_vec>>
+create_trapezoidmap(const std::vector<std::pair<t_vec, t_vec>>& lines)
+{
+	auto box = std::make_shared<Trapezoid<t_vec>>();
+	box->SetBoundingBox(lines);
+
+	auto node = std::make_shared<TrapezoidNodeTrapezoid<t_vec>>(box);
+
+	std::vector<std::pair<t_vec, t_vec>> randlines = lines;
+	std::ranges::shuffle(randlines, std::mt19937{std::random_device{}()});
+
+	for(const auto& line : randlines)
+	{
+		// TODO
+	}
+
+	return node;
+}
 // ----------------------------------------------------------------------------
 
 }

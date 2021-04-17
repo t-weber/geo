@@ -22,12 +22,11 @@ int main()
 	std::vector<std::pair<t_vec, t_vec>> lines
 	{
 		{ m::create<t_vec>({-5, 0}), m::create<t_vec>({5, 0}) },
-		{ m::create<t_vec>({-10, 0}), m::create<t_vec>({10, 0}) },
+		{ m::create<t_vec>({-10, 1}), m::create<t_vec>({10, 1}) },
 	};
 
-	g::TrapezoidNodePoint<t_vec> tp;
-	g::TrapezoidNodeLine<t_vec> tl;
-	g::TrapezoidNodeTrapezoid<t_vec> tt;
+	auto node = g::create_trapezoidmap<t_vec>(lines);
+	std::cout << std::make_pair(node, 0) << std::endl;
 
 	return 0;
 }
