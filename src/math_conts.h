@@ -21,7 +21,7 @@
 #define ROWSEP '|'
 
 
-
+// math operators
 namespace m_ops {
 // ----------------------------------------------------------------------------
 // vector operators
@@ -163,6 +163,7 @@ requires m::is_basic_vec<t_vec> && m::is_dyn_vec<t_vec>
 	return vec1;
 }
 
+
 /**
  * vector /= scalar
  */
@@ -173,7 +174,6 @@ requires m::is_basic_vec<t_vec> && m::is_dyn_vec<t_vec>
 	vec1 = vec1 / d;
 	return vec1;
 }
-
 
 
 /**

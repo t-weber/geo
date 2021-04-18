@@ -15,6 +15,7 @@
 //#include <iostream>
 
 
+// math
 namespace m {
 
 // ----------------------------------------------------------------------------
@@ -24,7 +25,7 @@ namespace m {
  * requirements for a scalar type
  */
 template<class T>
-concept /*bool*/ is_scalar =
+concept is_scalar =
 	std::is_floating_point_v<T> || std::is_integral_v<T> /*|| std::is_arithmetic_v<T>*/;
 
 
@@ -32,7 +33,7 @@ concept /*bool*/ is_scalar =
  * requirements for a basic vector container like std::vector
  */
 template<class T>
-concept /*bool*/ is_basic_vec = requires(const T& a)
+concept is_basic_vec = requires(const T& a)
 {
 	typename T::value_type;		// must have a value_type
 
@@ -44,7 +45,7 @@ concept /*bool*/ is_basic_vec = requires(const T& a)
  * requirements of a vector type with a dynamic size
  */
 template<class T>
-concept /*bool*/ is_dyn_vec = requires(const T& a)
+concept is_dyn_vec = requires(const T& a)
 {
 	T(3); T{3};					// constructor with size
 };
@@ -53,7 +54,7 @@ concept /*bool*/ is_dyn_vec = requires(const T& a)
  * requirements for a vector container
  */
 template<class T>
-concept /*bool*/ is_vec = requires(const T& a)
+concept is_vec = requires(const T& a)
 {
 	a+a;						// operator+
 	a-a;						// operator-
@@ -67,7 +68,7 @@ concept /*bool*/ is_vec = requires(const T& a)
  * requirements for a basic matrix container
  */
 template<class T>
-concept /*bool*/ is_basic_mat = requires(const T& a)
+concept is_basic_mat = requires(const T& a)
 {
 	typename T::value_type;		// must have a value_type
 
@@ -80,7 +81,7 @@ concept /*bool*/ is_basic_mat = requires(const T& a)
  * requirements of a matrix type with a dynamic size
  */
 template<class T>
-concept /*bool*/ is_dyn_mat = requires(const T& a)
+concept is_dyn_mat = requires(const T& a)
 {
 	T(3,3);	T{3,3};					// constructor with sizes
 };
@@ -89,7 +90,7 @@ concept /*bool*/ is_dyn_mat = requires(const T& a)
  * requirements for a matrix container
  */
 template<class T>
-concept /*bool*/ is_mat = requires(const T& a)
+concept is_mat = requires(const T& a)
 {
 	a+a;						// operator+
 	a-a;						// operator-
@@ -105,7 +106,7 @@ concept /*bool*/ is_mat = requires(const T& a)
  * requirements for a complex number
  */
 template<class T>
-concept /*bool*/ is_complex = requires(const T& a)
+concept is_complex = requires(const T& a)
 {
 	typename T::value_type;		// must have a value_type
 
@@ -124,7 +125,7 @@ concept /*bool*/ is_complex = requires(const T& a)
  * requirements for an iterable container
  */
 template<class T>
-concept /*bool*/ is_iterable = requires(const T& a)
+concept is_iterable = requires(const T& a)
 {
 	a.begin();
 	a.end();
