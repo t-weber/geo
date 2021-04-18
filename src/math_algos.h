@@ -3105,6 +3105,20 @@ requires is_mat<t_mat>
 	});
 }
 
+
+/**
+ * shear matrix
+ * @see https://en.wikipedia.org/wiki/Shear_matrix
+ */
+template<class t_mat, class t_real = typename t_mat::value_type>
+t_mat shear(std::size_t ROWS, std::size_t COLS, std::size_t i, std::size_t j, t_real s)
+requires is_mat<t_mat>
+{
+	t_mat mat = unit<t_mat>(ROWS, COLS);
+	mat(i,j) = s;
+	return mat;
+}
+
 // ----------------------------------------------------------------------------
 
 

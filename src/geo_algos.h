@@ -18,6 +18,7 @@
 #include <set>
 #include <tuple>
 #include <stack>
+#include <unordered_set>
 #include <algorithm>
 #include <limits>
 #include <random>
@@ -123,6 +124,86 @@ requires m::is_vec<t_vec>
 {
 	return line_angle<t_vec, t_real>(line2vert1, line2vert2)
 		- line_angle<t_vec, t_real>(line1vert1, line1vert2);
+}
+
+
+template<class t_vec>
+std::pair<bool, t_vec>
+intersect_lines(const t_vec& pos1a, const t_vec& pos1b,
+	const t_vec& pos2a, const t_vec& pos2b, bool only_segments=true)
+requires m::is_vec<t_vec>
+{
+	t_vec dir1 = pos1b - pos1a;
+	t_vec dir2 = pos2b - pos2a;
+
+	auto[pt1, pt2, valid, dist, param1, param2] =
+		m::intersect_line_line(pos1a, dir1, pos2a, dir2);
+
+	if(!valid)
+		return std::make_pair(false, m::create<t_vec>({}));
+
+	if(only_segments && (param1<0. || param1>1. || param2<0. || param2>1.))
+		return std::make_pair(false, m::create<t_vec>({}));
+
+	return std::make_pair(true, pt1);
+}
+
+
+template<class t_vec, class t_line=std::pair<t_vec, t_vec>, class t_real=typename t_vec::value_type>
+requires m::is_vec<t_vec>
+std::pair<t_real, t_real> get_line_slope_offs(const t_line& line)
+{
+	t_real slope = (std::get<1>(line)[1] - std::get<0>(line)[1])
+	/ (std::get<1>(line)[0] - std::get<0>(line)[0]);
+	t_real offs = std::get<0>(line)[1] - std::get<0>(line)[0]*slope;
+
+	return std::make_pair(slope, offs);
+}
+
+
+template<class t_vec, class t_line=std::pair<t_vec, t_vec>, class t_real=typename t_vec::value_type>
+requires m::is_vec<t_vec>
+t_real get_line_y(const t_line& line, t_real x)
+{
+	auto [slope, offs] = get_line_slope_offs<t_vec>(line);
+	return slope*x + offs;
+}
+
+
+/**
+ * are two lines equal?
+ */
+template<class t_vec, class t_line=std::pair<t_vec, t_vec>, class t_real=typename t_vec::value_type>
+requires m::is_vec<t_vec>
+bool is_line_equal(const t_line& line1, const t_line& line2,
+	t_real eps=std::numeric_limits<t_real>::epsilon(),
+	bool test_literal_equality = false)
+{
+	if(test_literal_equality)
+	{
+		if(!m::equals<t_vec>(std::get<0>(line1), std::get<0>(line2), eps))
+			return false;
+		if(!m::equals<t_vec>(std::get<1>(line1), std::get<1>(line2), eps))
+			return false;
+		return true;
+	}
+	else
+	{
+		auto [slope1, offs1] = get_line_slope_offs<t_vec>(line1);
+		auto [slope2, offs2] = get_line_slope_offs<t_vec>(line2);
+
+		return m::equals<t_real>(slope1, slope2, eps) && m::equals<t_real>(offs1, offs2, eps);
+	}
+}
+
+
+template<class t_line /*= std::pair<t_vec, t_vec>*/>
+std::tuple<bool, typename t_line::first_type>
+intersect_lines(const t_line& line1, const t_line& line2)
+requires m::is_vec<typename t_line::first_type> && m::is_vec<typename t_line::second_type>
+{
+	return intersect_lines<typename t_line::first_type>(
+		line1.first, line1.second, line2.first, line2.second, true);
 }
 
 
@@ -303,59 +384,6 @@ requires m::is_vec<t_vec>
 	}
 
 	return indices;
-}
-
-
-template<class t_vec>
-std::pair<bool, t_vec>
-intersect_lines(const t_vec& pos1a, const t_vec& pos1b,
-	const t_vec& pos2a, const t_vec& pos2b, bool only_segments=true)
-requires m::is_vec<t_vec>
-{
-	t_vec dir1 = pos1b - pos1a;
-	t_vec dir2 = pos2b - pos2a;
-
-	auto[pt1, pt2, valid, dist, param1, param2] =
-		m::intersect_line_line(pos1a, dir1, pos2a, dir2);
-
-	if(!valid)
-		return std::make_pair(false, m::create<t_vec>({}));
-
-	if(only_segments && (param1<0. || param1>1. || param2<0. || param2>1.))
-		return std::make_pair(false, m::create<t_vec>({}));
-
-	return std::make_pair(true, pt1);
-}
-
-
-template<class t_vec, class t_line=std::pair<t_vec, t_vec>, class t_real=typename t_vec::value_type>
-requires m::is_vec<t_vec>
-std::pair<t_real, t_real> get_line_slope_offs(const t_line& line)
-{
-	t_real slope = (std::get<1>(line)[1] - std::get<0>(line)[1])
-	/ (std::get<1>(line)[0] - std::get<0>(line)[0]);
-	t_real offs = std::get<0>(line)[1] - std::get<0>(line)[0]*slope;
-
-	return std::make_pair(slope, offs);
-}
-
-
-template<class t_vec, class t_line=std::pair<t_vec, t_vec>, class t_real=typename t_vec::value_type>
-requires m::is_vec<t_vec>
-t_real get_line_y(const t_line& line, t_real x)
-{
-	auto [slope, offs] = get_line_slope_offs<t_vec>(line);
-	return slope*x + offs;
-}
-
-
-template<class t_line /*= std::pair<t_vec, t_vec>*/>
-std::tuple<bool, typename t_line::first_type>
-intersect_lines(const t_line& line1, const t_line& line2)
-requires m::is_vec<typename t_line::first_type> && m::is_vec<typename t_line::second_type>
-{
-	return intersect_lines<typename t_line::first_type>(
-		line1.first, line1.second, line2.first, line2.second, true);
 }
 
 
@@ -2549,13 +2577,15 @@ public:
 
 	const t_vec& GetLeftPoint() const { return m_pointLeft; }
 	const t_vec& GetRightPoint() const { return m_pointRight; }
-
-	const t_line& GetTopLine() const { return m_lineTop; }
-	const t_line& GetBottomLine() const { return m_lineBottom; }
-
+	t_vec& GetLeftPoint() { return m_pointLeft; }
+	t_vec& GetRightPoint() { return m_pointRight; }
 	void SetLeftPoint(const t_vec& pt) { m_pointLeft = pt; }
 	void SetRightPoint(const t_vec& pt) { m_pointRight = pt; }
 
+	const t_line& GetTopLine() const { return m_lineTop; }
+	const t_line& GetBottomLine() const { return m_lineBottom; }
+	t_line& GetTopLine() { return m_lineTop; }
+	t_line& GetBottomLine() { return m_lineBottom; }
 
 	void SetTopLine(const t_line& line)
 	{
@@ -2565,7 +2595,6 @@ public:
 		if(std::get<0>(m_lineTop)[0] > std::get<1>(m_lineTop)[0])
 			std::swap(std::get<0>(m_lineTop), std::get<1>(m_lineTop));
 	}
-
 
 	void SetBottomLine(const t_line& line)
 	{
@@ -2601,9 +2630,23 @@ public:
 
 
 	/**
+	 * trapezoid with no area
+	 */
+	bool IsEmpty(t_real eps=std::numeric_limits<t_real>::epsilon()) const
+	{
+		if(m::equals<t_real>(m_pointLeft[0], m_pointRight[0], eps))
+			return true;
+		if(is_line_equal<t_vec>(m_lineTop, m_lineBottom, eps))
+			return true;
+
+		return false;
+	}
+
+
+	/**
 	 * let the trapezoid be the bounding box of the given points
 	 */
-	void SetBoundingBox(const std::vector<t_vec>& pts)
+	void SetBoundingBox(const std::vector<t_vec>& pts, t_real eps=std::numeric_limits<t_real>::epsilon())
 	{
 		t_real xmin = std::numeric_limits<t_real>::max();
 		t_real xmax = -xmin;
@@ -2618,11 +2661,8 @@ public:
 			ymax = std::max(ymax, pt[1]);
 		}
 
-		/*t_real eps = 1e-3;
-		xmin -= eps;
-		xmax += eps;
-		ymin -= eps;
-		ymax += eps;*/
+		xmin -= eps; xmax += eps;
+		ymin -= eps; ymax += eps;
 
 		m_pointLeft = m::create<t_vec>({xmin, ymin});
 		m_pointRight = m::create<t_vec>({xmax, ymax});
@@ -2635,7 +2675,7 @@ public:
 	/**
 	 * let the trapezoid be the bounding box of the given line segments
 	 */
-	void SetBoundingBox(const std::vector<t_line>& lines)
+	void SetBoundingBox(const std::vector<t_line>& lines, t_real eps=std::numeric_limits<t_real>::epsilon())
 	{
 		std::vector<t_vec> pts;
 		pts.reserve(lines.size()*2);
@@ -2646,7 +2686,7 @@ public:
 			pts.push_back(std::get<1>(line));
 		}
 
-		SetBoundingBox(pts);
+		SetBoundingBox(pts, eps);
 	}
 
 
@@ -2730,6 +2770,8 @@ public:
 
 
 	const t_vec& GetPoint() const { return m_vec; }
+	t_vec& GetPoint() { return m_vec; }
+	void SetPoint(const t_vec& vec) { m_vec = vec; }
 
 
 private:
@@ -2795,6 +2837,8 @@ public:
 
 
 	const t_line& GetLine() const { return m_line; }
+	t_line& GetLine() { return m_line; }
+	void SetLine(const t_line& line) { m_line = line; }
 
 
 private:
@@ -2943,33 +2987,6 @@ std::ostream& operator<<(std::ostream& ostr,
 
 
 /**
- * are two lines equals
- */
-template<class t_vec, class t_line=std::pair<t_vec, t_vec>, class t_real=typename t_vec::value_type>
-requires m::is_vec<t_vec>
-bool is_line_equal(const t_line& line1, const t_line& line2,
-	t_real eps=std::numeric_limits<t_real>::epsilon(),
-	bool test_literal_equality = false)
-{
-	if(test_literal_equality)
-	{
-		if(!m::equals<t_vec>(std::get<0>(line1), std::get<0>(line2), eps))
-			return false;
-		if(!m::equals<t_vec>(std::get<1>(line1), std::get<1>(line2), eps))
-			return false;
-		return true;
-	}
-	else
-	{
-		auto [slope1, offs1] = get_line_slope_offs<t_vec>(line1);
-		auto [slope2, offs2] = get_line_slope_offs<t_vec>(line2);
-
-		return m::equals<t_real>(slope1, slope2, eps) && m::equals<t_real>(offs1, offs2, eps);
-	}
-}
-
-
-/**
  * find a neighbouring trapezoid in the tree
  */
 template<class t_vec, class t_line=std::pair<t_vec, t_vec>, class t_real=typename t_vec::value_type>
@@ -3067,11 +3084,16 @@ std::shared_ptr<TrapezoidNodeTrapezoid<t_vec>> find_trapezoid(
 	traverse = [&candidates, &pt, &traverse]
 		(const std::shared_ptr<TrapezoidNode<t_vec>>& node) -> void
 	{
-		// TODO: better use of binary search tree, no need to check all nodes...
-		if(node->GetLeft())
-			traverse(node->GetLeft());
-		if(node->GetRight())
-			traverse(node->GetRight());
+		if(node->IsLeft(pt))
+		{
+			if(node->GetLeft())
+				traverse(node->GetLeft());
+		}
+		else
+		{
+			if(node->GetRight())
+				traverse(node->GetRight());
+		}
 
 		if(node->GetType() == TrapezoidNodeType::TRAPEZOID)
 		{
@@ -3166,6 +3188,65 @@ void fit_trapezoid_lines(std::shared_ptr<TrapezoidNode<t_vec>> node)
 
 
 /**
+ * transform all points, lines and trapezoids in the tree
+ */
+template<class t_vec, class t_mat>
+requires m::is_vec<t_vec> && m::is_mat<t_mat>
+void trafo_trapezoid_tree(std::shared_ptr<TrapezoidNode<t_vec>> node, const t_mat& mat,
+	std::shared_ptr<std::unordered_set<void*>> cache=nullptr)
+{
+	// prevent pointers in the tree to be transformed multiple times
+	if(!cache)
+		cache = std::make_shared<std::unordered_set<void*>>();
+
+	if(node->GetType() == TrapezoidNodeType::POINT)
+	{
+		auto ptnode = std::dynamic_pointer_cast<TrapezoidNodePoint<t_vec>>(node);
+
+		if(cache->find(ptnode.get()) == cache->end())
+		{
+			ptnode->SetPoint(mat * ptnode->GetPoint());
+			cache->insert(ptnode.get());
+		}
+	}
+	else if(node->GetType() == TrapezoidNodeType::LINE)
+	{
+		auto lnnode = std::dynamic_pointer_cast<TrapezoidNodeLine<t_vec>>(node);
+
+		if(cache->find(lnnode.get()) == cache->end())
+		{
+			std::get<0>(lnnode->GetLine()) = mat * std::get<0>(lnnode->GetLine());
+			std::get<1>(lnnode->GetLine()) = mat * std::get<1>(lnnode->GetLine());
+
+			cache->insert(lnnode.get());
+		}
+	}
+	else if(node->GetType() == TrapezoidNodeType::TRAPEZOID)
+	{
+		auto trnode = std::dynamic_pointer_cast<TrapezoidNodeTrapezoid<t_vec>>(node);
+		auto trap = trnode->GetTrapezoid();
+
+		if(cache->find(trap.get()) == cache->end())
+		{
+			trap->SetLeftPoint(mat * trap->GetLeftPoint());
+			trap->SetRightPoint(mat * trap->GetRightPoint());
+			std::get<0>(trap->GetTopLine()) = mat * std::get<0>(trap->GetTopLine());
+			std::get<1>(trap->GetTopLine()) = mat * std::get<1>(trap->GetTopLine());
+			std::get<0>(trap->GetBottomLine()) = mat * std::get<0>(trap->GetBottomLine());
+			std::get<1>(trap->GetBottomLine()) = mat * std::get<1>(trap->GetBottomLine());
+
+			cache->insert(trap.get());
+		}
+	}
+
+	if(node->GetLeft())
+		trafo_trapezoid_tree<t_vec, t_mat>(node->GetLeft(), mat, cache);
+	if(node->GetRight())
+		trafo_trapezoid_tree<t_vec, t_mat>(node->GetRight(), mat, cache);
+}
+
+
+/**
  * save the trapezoid tree as an svg
  */
 template<class t_vec, class t_line = std::pair<t_vec, t_vec>, class t_real = typename t_vec::value_type>
@@ -3231,25 +3312,43 @@ void save_trapezoid_svg(const std::shared_ptr<TrapezoidNode<t_vec>>& node,
 
 /**
  * create a trapezoid tree
- * @see (Berg 2008), pp. 128-133
+ * @see (Berg 2008), pp. 128-133 and pp. 137-139
  */
 template<class t_vec, class t_line = std::pair<t_vec, t_vec>, class t_real = typename t_vec::value_type>
 requires m::is_vec<t_vec>
 std::shared_ptr<TrapezoidNode<t_vec>>
-create_trapezoid_tree(const std::vector<t_line>& lines, bool randomise=true, t_real eps=1e-5)
+create_trapezoid_tree(const std::vector<t_line>& _lines,
+	bool randomise=true, bool shear=true,
+	t_real padding=1., t_real eps=1e-5)
 {
+	using t_mat = m::mat<t_real, std::vector>;
+	std::vector<t_line> lines = _lines;
+
+	t_real shear_eps = eps * 10.;
+	if(shear)
+	{
+		t_mat shear = m::shear<t_mat>(2, 2, 0, 1, shear_eps);
+
+		for(auto& line : lines)
+		{
+			std::cout << std::get<0>(line)[0] << " " << std::get<0>(line)[1] << std::endl;
+			std::get<0>(line) = shear*std::get<0>(line);
+			std::get<1>(line) = shear*std::get<1>(line);
+			std::cout << std::get<0>(line)[0] << " " << std::get<0>(line)[1] << std::endl;
+		}
+	}
+
 	auto box = std::make_shared<Trapezoid<t_vec>>();
-	box->SetBoundingBox(lines);
+	box->SetBoundingBox(lines, padding);
 
 	std::shared_ptr<TrapezoidNode<t_vec>> root =
 		std::make_shared<TrapezoidNodeTrapezoid<t_vec>>(box);
 
-	std::vector<t_line> randlines = lines;
 	if(randomise)
-		std::ranges::shuffle(randlines, std::mt19937{std::random_device{}()});
+		std::ranges::shuffle(lines, std::mt19937{std::random_device{}()});
 
 	// add lines to the tree
-	for(const auto& line : randlines)
+	for(const auto& line : lines)
 	{
 		// line is bounding box line
 		/*if(is_line_equal<t_vec>(line, box->GetTopLine(), eps))
@@ -3271,11 +3370,11 @@ create_trapezoid_tree(const std::vector<t_line>& lines, bool randomise=true, t_r
 		auto cur_trap = intersecting_trapezoids[0];
 		while(cur_trap)
 		{
-			const auto& cur_rightpt = cur_trap->GetTrapezoid()->GetRightPoint();
-			if(rightpt[0] <= cur_rightpt[0])
+			const auto& trap_rightpt = cur_trap->GetTrapezoid()->GetRightPoint();
+			if(rightpt[0] <= trap_rightpt[0])
 				break;
 
-			if(side_of_line<t_vec, t_real>(leftpt, rightpt, cur_rightpt) >= t_real(0))
+			if(side_of_line<t_vec, t_real>(leftpt, rightpt, trap_rightpt) >= t_real(0))
 				cur_trap = find_neighbour_trapezoid<t_vec>(root, cur_trap->GetTrapezoid(), 0, 0, eps);
 			else
 				cur_trap = find_neighbour_trapezoid<t_vec>(root, cur_trap->GetTrapezoid(), 0, 1, eps);
@@ -3323,11 +3422,14 @@ create_trapezoid_tree(const std::vector<t_line>& lines, bool randomise=true, t_r
 			auto trap_bottom_node = std::make_shared<TrapezoidNodeTrapezoid<t_vec>>(trap_bottom);
 
 			auto line_node = std::make_shared<TrapezoidNodeLine<t_vec>>(line);
-			line_node->SetLeft(trap_top_node);
-			line_node->SetRight(trap_bottom_node);
+			if(!trap_top->IsEmpty(eps))
+				line_node->SetLeft(trap_top_node);
+			if(!trap_bottom->IsEmpty(eps))
+				line_node->SetRight(trap_bottom_node);
 
 			auto rightpt_node = std::make_shared<TrapezoidNodePoint<t_vec>>(rightpt);
 			rightpt_node->SetLeft(line_node);
+			if(!trap_right->IsEmpty(eps))
 			rightpt_node->SetRight(trap_right_node);
 
 			auto leftpt_node = std::make_shared<TrapezoidNodePoint<t_vec>>(leftpt);
@@ -3377,11 +3479,14 @@ create_trapezoid_tree(const std::vector<t_line>& lines, bool randomise=true, t_r
 			auto first_bottom_node = std::make_shared<TrapezoidNodeTrapezoid<t_vec>>(first_bottom);
 
 			auto first_line_node = std::make_shared<TrapezoidNodeLine<t_vec>>(line);
-			first_line_node->SetLeft(first_top_node);
-			first_line_node->SetRight(first_bottom_node);
+			if(!first_top->IsEmpty(eps))
+				first_line_node->SetLeft(first_top_node);
+			if(!first_bottom->IsEmpty(eps))
+				first_line_node->SetRight(first_bottom_node);
 
 			auto first_leftpt_node = std::make_shared<TrapezoidNodePoint<t_vec>>(leftpt);
-			first_leftpt_node->SetLeft(first_left_node);
+			if(!first_left->IsEmpty(eps))
+				first_leftpt_node->SetLeft(first_left_node);
 			first_leftpt_node->SetRight(first_line_node);
 
 
@@ -3412,12 +3517,15 @@ create_trapezoid_tree(const std::vector<t_line>& lines, bool randomise=true, t_r
 			auto last_bottom_node = std::make_shared<TrapezoidNodeTrapezoid<t_vec>>(last_bottom);
 
 			auto last_line_node = std::make_shared<TrapezoidNodeLine<t_vec>>(line);
-			last_line_node->SetLeft(last_top_node);
-			last_line_node->SetRight(last_bottom_node);
+			if(!last_top->IsEmpty(eps))
+				last_line_node->SetLeft(last_top_node);
+			if(!last_bottom->IsEmpty(eps))
+				last_line_node->SetRight(last_bottom_node);
 
 			auto last_rightpt_node = std::make_shared<TrapezoidNodePoint<t_vec>>(rightpt);
 			last_rightpt_node->SetLeft(last_line_node);
-			last_rightpt_node->SetRight(last_right_node);
+			if(!last_right->IsEmpty(eps))
+				last_rightpt_node->SetRight(last_right_node);
 
 
 			// mid trapezoids
@@ -3442,11 +3550,14 @@ create_trapezoid_tree(const std::vector<t_line>& lines, bool randomise=true, t_r
 				auto mid_bottom_node = std::make_shared<TrapezoidNodeTrapezoid<t_vec>>(mid_bottom);
 
 				auto mid_line_node = std::make_shared<TrapezoidNodeLine<t_vec>>(line);
-				mid_line_node->SetLeft(mid_top_node);
-				mid_line_node->SetRight(mid_bottom_node);
+				if(!mid_top->IsEmpty(eps))
+					mid_line_node->SetLeft(mid_top_node);
+				if(!mid_bottom->IsEmpty(eps))
+					mid_line_node->SetRight(mid_bottom_node);
 
 				// TODO: unit trapezoids with first and last trapezoids
 				// TODO: optimise pointers / reuse trapezoids
+				// TODO: prune nodes without leaves
 
 				fit_trapezoid_lines<t_vec>(mid_line_node);
 
@@ -3495,6 +3606,13 @@ create_trapezoid_tree(const std::vector<t_line>& lines, bool randomise=true, t_r
 				replace_trapezoid_node_ptr<t_vec>(root, last_trap_node, last_rightpt_node);
 			}
 		}
+	}
+
+	if(shear)
+	{
+		// TODO: remove tilt
+		t_mat shear_inv = m::shear<t_mat>(2, 2, 0, 1, -shear_eps);
+		trafo_trapezoid_tree<t_vec, t_mat>(root, shear_inv);
 	}
 
 	return root;
