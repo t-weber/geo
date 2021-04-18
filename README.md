@@ -1,5 +1,5 @@
 # geo
-Basic geometry algorithms.
+Basic geometry algorithms and calculations.
 
 
 ## Compile
