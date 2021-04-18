@@ -18,6 +18,7 @@
 #include <set>
 #include <tuple>
 #include <stack>
+#include <set>
 #include <unordered_set>
 #include <algorithm>
 #include <limits>
@@ -1289,6 +1290,7 @@ requires m::is_vec<t_vec>
 
 /**
  * delaunay triangulation using parabolic trafo
+ * @see (Berg 2008), pp. 254-256 and p. 168
  */
 template<class t_vec>
 std::tuple<std::vector<t_vec>, std::vector<std::vector<t_vec>>, std::vector<std::set<std::size_t>>>
@@ -3311,6 +3313,52 @@ void save_trapezoid_svg(const std::shared_ptr<TrapezoidNode<t_vec>>& node,
 
 
 /**
+ * check if the line segments share the same x coordinates
+ */
+template<class t_vec, class t_line = std::pair<t_vec, t_vec>, class t_real = typename t_vec::value_type>
+requires m::is_vec<t_vec>
+bool check_line_equal_x(const std::vector<t_line>& lines, t_real eps=std::numeric_limits<t_real>::epsilon())
+{
+	struct CompareReals
+	{
+		CompareReals() = delete;
+		CompareReals(t_real eps) : m_eps{eps}
+		{}
+
+		bool operator()(t_real x, t_real y) const
+		{
+			//std::cout << x << " < " << y << ", eps = " << m_eps << std::endl;
+
+			if(m::equals<t_real>(x, y, m_eps))
+				return false;
+
+			return x < y;
+		}
+
+		t_real m_eps = std::numeric_limits<t_real>::epsilon();
+	};
+
+	std::set<t_real, CompareReals> cache_x0{CompareReals{eps}}, cache_x1{CompareReals{eps}};
+
+	for(const t_line& line : lines)
+	{
+		t_real x0 = std::get<0>(line)[0];
+		t_real x1 = std::get<1>(line)[0];
+
+		if(cache_x0.find(x0) != cache_x0.end())
+			return true;
+		if(cache_x1.find(x1) != cache_x1.end())
+			return true;
+
+		cache_x0.insert(x0);
+		cache_x1.insert(x1);
+	}
+
+	return false;
+}
+
+
+/**
  * create a trapezoid tree
  * @see (Berg 2008), pp. 128-133 and pp. 137-139
  */
@@ -3327,15 +3375,23 @@ create_trapezoid_tree(const std::vector<t_line>& _lines,
 	t_real shear_eps = eps * 10.;
 	if(shear)
 	{
-		t_mat shear = m::shear<t_mat>(2, 2, 0, 1, shear_eps);
-
-		for(auto& line : lines)
+		// shear until no more x coordinates coincide
+		t_real shear_mult = 1;
+		while(check_line_equal_x<t_vec>(lines, eps))
 		{
-			std::cout << std::get<0>(line)[0] << " " << std::get<0>(line)[1] << std::endl;
-			std::get<0>(line) = shear*std::get<0>(line);
-			std::get<1>(line) = shear*std::get<1>(line);
-			std::cout << std::get<0>(line)[0] << " " << std::get<0>(line)[1] << std::endl;
+			t_mat shear = m::shear<t_mat>(2, 2, 0, 1, shear_eps);
+
+			for(auto& line : lines)
+			{
+				std::cout << std::get<0>(line)[0] << " " << std::get<0>(line)[1] << std::endl;
+				std::get<0>(line) = shear*std::get<0>(line);
+				std::get<1>(line) = shear*std::get<1>(line);
+				std::cout << std::get<0>(line)[0] << " " << std::get<0>(line)[1] << std::endl;
+			}
+
+			++shear_mult;
 		}
+		shear_eps *= shear_mult;
 	}
 
 	auto box = std::make_shared<Trapezoid<t_vec>>();

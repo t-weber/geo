@@ -6,7 +6,7 @@
  *
  * References:
  *	- "Algorithmische Geometrie" (2005), ISBN: 978-3540209560 (http://dx.doi.org/10.1007/3-540-27619-X), Ch. 3.3.2, pp. 135f (range tree).
- *	- "Computational Geometry" (2008), ISBN: 978-3-642-09681-5 (http://dx.doi.org/10.1007/978-3-540-77974-2).
+ *	- (Berg 2008) "Computational Geometry" (2008), ISBN: 978-3-642-09681-5 (http://dx.doi.org/10.1007/978-3-540-77974-2).
  *	- https://www.boost.org/doc/libs/1_74_0/doc/html/intrusive/node_algorithms.html
  */
 
@@ -113,7 +113,7 @@ struct CommonTreeNode
 
 /**
  * common node traits
- * see: https://www.boost.org/doc/libs/1_74_0/doc/html/intrusive/node_algorithms.html
+ * @see https://www.boost.org/doc/libs/1_74_0/doc/html/intrusive/node_algorithms.html
  */
 template<class t_tree_node>
 requires is_tree_node<t_tree_node>
@@ -356,7 +356,7 @@ struct RangeTreeNode : public CommonTreeNode<t_vec, RangeTreeNode>
 
 /**
  * range tree node traits
- * see: https://www.boost.org/doc/libs/1_74_0/doc/html/intrusive/node_algorithms.html
+ * @see https://www.boost.org/doc/libs/1_74_0/doc/html/intrusive/node_algorithms.html
  */
 template<class t_vec>
 requires m::is_basic_vec<t_vec>
@@ -412,6 +412,7 @@ struct RangeTreeNodeTraits : public BasicNodeTraits<RangeTreeNode<t_vec>>
 
 /**
  * k-dim range tree
+ * @see (Berg 2008) pp. 105-110
  */
 template<class t_vec>
 requires m::is_basic_vec<t_vec>
@@ -684,6 +685,8 @@ using TreapNodeTraits = BasicNodeTraits<TreapNode<t_vec>>;
 
 /**
  * 2-dim treap: tree in first component, heap in second component
+ * @see https://en.wikipedia.org/wiki/Treap
+ * @see (Berg 2008) pp. 226-230
  */
 template<class t_vec>
 requires m::is_basic_vec<t_vec>
