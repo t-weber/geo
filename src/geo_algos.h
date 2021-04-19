@@ -5,8 +5,9 @@
  * @license: see 'LICENSE' file
  *
  * Reference for the algorithms:
- *	- "Algorithmische Geometrie" (2005), ISBN: 978-3540209560 (http://dx.doi.org/10.1007/3-540-27619-X).
- *	- (Berg 2008) "Computational Geometry" (2008), ISBN: 978-3-642-09681-5 (http://dx.doi.org/10.1007/978-3-540-77974-2).
+ *   - (Klein 2005) "Algorithmische Geometrie" (2005), ISBN: 978-3540209560 (http://dx.doi.org/10.1007/3-540-27619-X).
+ *   - (FUH 2020) "Algorithmische Geometrie" (2020), Kurs 1840, Fernuni Hagen (https://vu.fernuni-hagen.de/lvuweb/lvu/app/Kurs/1840).
+ *   - (Berg 2008) "Computational Geometry" (2008), ISBN: 978-3-642-09681-5 (http://dx.doi.org/10.1007/978-3-540-77974-2).
  */
 
 #ifndef __GEO2D_ALGOS_H__
@@ -479,9 +480,14 @@ t_real geo_series(t_real x, std::size_t n)
 
 // ----------------------------------------------------------------------------
 // convex hull algorithms
-// Reference: "Algorithmische Geometrie" (2005), ISBN: 978-3540209560, Ch. 4.1, pp. 155f
+// @see (Klein 2005), ch. 4.1, pp. 155f
+// @see (FUH 2020), ch. 3, pp. 113-160
 // ----------------------------------------------------------------------------
 
+/**
+ * recursive calculation of convex hull
+ * @see (FUH 2020), ch. 3.1.4, pp. 123-125
+ */
 template<class t_vec, class t_real = typename t_vec::value_type>
 std::vector<t_vec>
 _calc_hull_recursive_sorted(const std::vector<t_vec>& verts, t_real eps = 1e-5)
@@ -618,7 +624,9 @@ requires m::is_vec<t_vec>
 // ----------------------------------------------------------------------------
 
 
-// tests if the vertex is in the hull
+/**
+ * tests if the vertex is in the hull
+ */
 template<class t_vec>
 std::tuple<bool, std::size_t, std::size_t>
 is_vert_in_hull(const std::vector<t_vec>& hull, const t_vec& newvert, const t_vec *vert_in_hull=nullptr)
@@ -657,6 +665,10 @@ requires m::is_vec<t_vec>
 };
 
 
+/**
+ * iterative calculation of convex hull
+ * @see (FUH 2020), ch. 3.1.3, pp. 117-123
+ */
 template<class t_vec, class t_real = typename t_vec::value_type>
 std::vector<t_vec>
 calc_hull_iterative(const std::vector<t_vec>& _verts, t_real eps = 1e-5)
@@ -715,6 +727,10 @@ requires m::is_vec<t_vec>
 }
 
 
+/**
+ * iterative calculation of convex hull
+ * @see (FUH 2020), ch. 3.1.3, pp. 117-123
+ */
 template<class t_vec, class t_real = typename t_vec::value_type>
 std::vector<t_vec>
 calc_hull_iterative_bintree(const std::vector<t_vec>& _verts, t_real eps = 1e-5)
@@ -851,6 +867,10 @@ requires m::is_vec<t_vec>
 // ----------------------------------------------------------------------------
 
 
+/**
+ * calculation of convex hull
+ * @see (FUH 2020), ch. 3.1.5, pp. 125-128
+ */
 template<class t_vec, class t_real = typename t_vec::value_type>
 std::vector<t_vec>
 calc_hull_contour(const std::vector<t_vec>& _verts, t_real eps = 1e-5)
@@ -962,7 +982,8 @@ requires m::is_vec<t_vec>
 
 // ----------------------------------------------------------------------------
 // delaunay triangulation
-// Reference: "Algorithmische Geometrie" (2005), ISBN: 978-3540209560, Ch. 6, pp. 269f
+// @see (Klein 2005), ch. 6, pp. 269f
+// @see (FUH 2020), ch. 5.3, pp. 228-232
 // ----------------------------------------------------------------------------
 
 /**
@@ -1078,7 +1099,7 @@ requires m::is_vec<t_vec>
 
 
 /**
- * @returns [triangle index, shared index 1, shared index 2, nonshared index]
+ * @returns [triangle index, shared index 1, shared index 2, non-shared index]
  */
 template<class t_vec, class t_real = typename t_vec::value_type>
 std::optional<std::tuple<std::size_t, std::size_t, std::size_t, std::size_t>>
@@ -1159,6 +1180,7 @@ requires m::is_vec<t_vec>
 
 /**
  * iterative delaunay triangulation
+ * @see (FUH 2020), ch. 6.2, pp. 269-282
  */
 template<class t_vec, class t_real = typename t_vec::value_type>
 std::tuple<std::vector<t_vec>, std::vector<std::vector<t_vec>>, std::vector<std::set<std::size_t>>>
@@ -1291,6 +1313,7 @@ requires m::is_vec<t_vec>
 /**
  * delaunay triangulation using parabolic trafo
  * @see (Berg 2008), pp. 254-256 and p. 168
+ * @see (FUH 2020), ch. 6.5, pp. 298-300
  */
 template<class t_vec>
 std::tuple<std::vector<t_vec>, std::vector<std::vector<t_vec>>, std::vector<std::set<std::size_t>>>
@@ -1521,7 +1544,8 @@ bool has_loops(const std::vector<t_edge>& edges, std::size_t start_from, std::si
 
 /**
  * minimal spanning tree
- * see: https://de.wikipedia.org/wiki/Algorithmus_von_Kruskal
+ * @see (FUH 2020), ch. 5.2.3, pp. 221-224
+ * @see https://de.wikipedia.org/wiki/Algorithmus_von_Kruskal
  */
 template<class t_vec, class t_edge = std::pair<std::size_t, std::size_t>>
 std::vector<t_edge>
@@ -1560,7 +1584,9 @@ requires m::is_vec<t_vec>
 }
 
 
-
+/**
+ * minimum spanning tree
+ */
 template<class t_vec, class t_edge = std::pair<std::size_t, std::size_t>>
 std::vector<t_edge>
 calc_min_spantree_boost(const std::vector<t_vec>& verts)
@@ -1616,7 +1642,8 @@ requires m::is_vec<t_vec>
 
 // ----------------------------------------------------------------------------
 // kernel
-// Reference: "Algorithmische Geometrie" (2005), ISBN: 978-3540209560, Ch. 4.4, pp. 195f
+// @see (Klein 2005), ch. 4.4, pp. 195f
+// @see (FUH 2020), ch. 3.3.2, pp. 142-143
 // ----------------------------------------------------------------------------
 
 template<class t_vec, class t_real = typename t_vec::value_type>
@@ -1642,6 +1669,7 @@ requires m::is_vec<t_vec>
 
 /**
  * lower halfplane intersection vertices
+ * @see (FUH 2020), ch. 3.3.2, pp. 142-143
  */
 template<class t_vec, class t_real = typename t_vec::value_type>
 std::vector<t_vec>
@@ -1703,7 +1731,10 @@ requires m::is_vec<t_vec>
 }
 
 
-
+/**
+ * kernel
+ * @see (FUH 2020), ch. 3.3.2, pp. 142-143
+ */
 template<class t_vec, class t_real = typename t_vec::value_type>
 std::vector<t_vec>
 calc_ker_tst(const std::vector<t_vec>& verts, t_real eps)
@@ -1806,7 +1837,8 @@ requires m::is_vec<t_vec>
 
 // ----------------------------------------------------------------------------
 // line segment intersections
-// Reference: "Algorithmische Geometrie" (2005), ISBN: 978-3540209560, Ch. 2.3.2, pp. 64f
+// @see (Klein 2005), ch. 2.3.2, pp. 64f
+// @see (FUH 2020), ch. 2.3.2, pp. 69-80
 // ----------------------------------------------------------------------------
 
 template<class t_vec, class t_line = std::pair<t_vec, t_vec>>
@@ -1877,6 +1909,10 @@ requires m::is_vec<t_vec> && m::is_mat<t_mat>
 }
 
 
+/**
+ * line segment intersection via sweep
+ * @see (FUH 2020), ch. 2.3.2, pp. 69-80
+ */
 template<class t_vec, class t_line = std::pair<t_vec, t_vec>, class t_real = typename t_vec::value_type>
 std::vector<std::tuple<std::size_t, std::size_t, t_vec>>
 intersect_sweep(const std::vector<t_line>& _lines, t_real eps = 1e-6)
@@ -2239,6 +2275,7 @@ requires m::is_iterable<t_arr> && m::is_basic_vec<t_arr>
 
 /**
  * maximum subvector
+ * @see (FUH 2020), ch. 2.2.3, pp. 59-61
  * @see https://en.wikipedia.org/wiki/Maximum_subarray_problem
  */
 template<class t_largernum, class t_arr>
@@ -2282,8 +2319,8 @@ requires m::is_iterable<t_arr> && m::is_basic_vec<t_arr>
 
 // ----------------------------------------------------------------------------
 // closest pair
-// Reference: "Algorithmische Geometrie" (2005), ISBN: 978-3540209560,
-//	Ch. 2.2.2, pp. 53f; Ch. 2.3.1, pp. 57f; Ch. 2.4.1, pp. 93f
+// @see (Klein 2005), ch. 2.2.2, pp. 53f; ch. 2.3.1, pp. 57f; ch. 2.4.1, pp. 93f
+// @see (FUH 2020), ch. 2.2.2, pp. 58-69; ch. 2.3.1, pp. 62-69; ch. 2.4.1, pp. 95-96
 // ----------------------------------------------------------------------------
 
 template<class t_vec, class t_real = typename t_vec::value_type>
@@ -2335,9 +2372,9 @@ struct ClosestPairTreeLeaf
 
 /**
  * closest pair (2d)
- * @see:
- *	- http://dx.doi.org/10.1007/3-540-27619-X, ch 2.3.1, p. 57
- *	- https://en.wikipedia.org/wiki/Closest_pair_of_points_problem
+ *  - @see (Klein 2005), ch 2.3.1, p. 57
+ *  - @see (FUH 2020), ch. 2.3.1, pp. 62-69
+ *	- @see https://en.wikipedia.org/wiki/Closest_pair_of_points_problem
  */
 template<class t_vec, class t_real = typename t_vec::value_type>
 std::tuple<t_vec, t_vec, t_real>
@@ -2504,6 +2541,7 @@ requires m::is_vec<t_vec>
 
 /**
  * closest pair (range tree)
+ * @see (FUH 2020), ch. 2.4.1, pp. 95-96; ch. 4.2.5, pp. 193-194
  */
 template<std::size_t dim, class t_vec, class t_real = typename t_vec::value_type>
 std::tuple<t_vec, t_vec, t_real>

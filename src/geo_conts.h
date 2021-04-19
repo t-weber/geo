@@ -5,9 +5,10 @@
  * @license: see 'LICENSE' file
  *
  * References:
- *	- "Algorithmische Geometrie" (2005), ISBN: 978-3540209560 (http://dx.doi.org/10.1007/3-540-27619-X), Ch. 3.3.2, pp. 135f (range tree).
- *	- (Berg 2008) "Computational Geometry" (2008), ISBN: 978-3-642-09681-5 (http://dx.doi.org/10.1007/978-3-540-77974-2).
- *	- https://www.boost.org/doc/libs/1_74_0/doc/html/intrusive/node_algorithms.html
+ *   - (Klein 2005) "Algorithmische Geometrie" (2005), ISBN: 978-3540209560 (http://dx.doi.org/10.1007/3-540-27619-X).
+ *   - (FUH 2020) "Algorithmische Geometrie" (2020), Kurs 1840, Fernuni Hagen (https://vu.fernuni-hagen.de/lvuweb/lvu/app/Kurs/1840).
+ *   - (Berg 2008) "Computational Geometry" (2008), ISBN: 978-3-642-09681-5 (http://dx.doi.org/10.1007/978-3-540-77974-2).
+ *   - https://www.boost.org/doc/libs/1_74_0/doc/html/intrusive/node_algorithms.html
  */
 
 #ifndef __GEO_CONTS_H__
@@ -412,7 +413,8 @@ struct RangeTreeNodeTraits : public BasicNodeTraits<RangeTreeNode<t_vec>>
 
 /**
  * k-dim range tree
- * @see (Berg 2008) pp. 105-110
+ * @see (Klein 2005), ch. 3.3.2, pp. 135f
+ * @see (Berg 2008), pp. 105-110
  */
 template<class t_vec>
 requires m::is_basic_vec<t_vec>
@@ -686,7 +688,8 @@ using TreapNodeTraits = BasicNodeTraits<TreapNode<t_vec>>;
 /**
  * 2-dim treap: tree in first component, heap in second component
  * @see https://en.wikipedia.org/wiki/Treap
- * @see (Berg 2008) pp. 226-230
+ * @see (Berg 2008), pp. 226-230
+ * @see (FUH 2020), ch. 4.2.4, pp. 188-192
  */
 template<class t_vec>
 requires m::is_basic_vec<t_vec>
