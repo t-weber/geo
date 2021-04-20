@@ -3555,35 +3555,11 @@ create_trapezoid_tree(const std::vector<t_line>& _lines,
 		}
 
 
-		bool use_node_cache = false;
-		std::unordered_set<void*> node_cache;
-		auto create_trapnode_if_unique = [&node_cache, use_node_cache](std::shared_ptr<Trapezoid<t_vec>> trap)
+		auto create_trapnode = [](std::shared_ptr<Trapezoid<t_vec>> trap)
 			-> std::shared_ptr<TrapezoidNodeTrapezoid<t_vec>>
 		{
-			if(!use_node_cache)
-				return std::make_shared<TrapezoidNodeTrapezoid<t_vec>>(trap);
-
-			if(node_cache.find(trap.get()) == node_cache.end())
-			{
-				node_cache.insert(trap.get());
-				return std::make_shared<TrapezoidNodeTrapezoid<t_vec>>(trap);
-			}
-			else
-			{
-				return std::shared_ptr<TrapezoidNodeTrapezoid<t_vec>>{};
-			}
+			return std::make_shared<TrapezoidNodeTrapezoid<t_vec>>(trap);
 		};
-
-		/*auto clear_ptr_from_cache = [&node_cache, use_node_cache](void* ptr) -> void
-		{
-			if(!use_node_cache) return;
-			if(!ptr) return;
-
-			// pointers might get reused if something is deleted
-			// between two allocations, check for this case.
-			node_cache.erase(ptr);
-		};*/
-
 
 		if(intersecting_trapezoids.size() == 0)
 		{
@@ -3618,10 +3594,10 @@ create_trapezoid_tree(const std::vector<t_line>& _lines,
 			trap_bottom->SetTopLine(line);
 			trap_bottom->SetBottomLine(cur_trap->GetBottomLine());
 
-			auto trap_left_node = create_trapnode_if_unique(trap_left);
-			auto trap_right_node = create_trapnode_if_unique(trap_right);
-			auto trap_top_node = create_trapnode_if_unique(trap_top);
-			auto trap_bottom_node = create_trapnode_if_unique(trap_bottom);
+			auto trap_left_node = create_trapnode(trap_left);
+			auto trap_right_node = create_trapnode(trap_right);
+			auto trap_top_node = create_trapnode(trap_top);
+			auto trap_bottom_node = create_trapnode(trap_bottom);
 
 			/*try_unite_trapezoids(&trap_left, &trap_top, eps);
 			try_unite_trapezoids(&trap_left, &trap_bottom, eps);
@@ -3774,9 +3750,9 @@ create_trapezoid_tree(const std::vector<t_line>& _lines,
 
 
 			// first trapezoid
-			auto first_left_node = create_trapnode_if_unique(first_left);
-			auto first_top_node = create_trapnode_if_unique(first_top);
-			auto first_bottom_node = create_trapnode_if_unique(first_bottom);
+			auto first_left_node = create_trapnode(first_left);
+			auto first_top_node = create_trapnode(first_top);
+			auto first_bottom_node = create_trapnode(first_bottom);
 
 			auto first_line_node = std::make_shared<TrapezoidNodeLine<t_vec>>(line);
 			if(!first_top->IsEmpty(eps))
@@ -3812,8 +3788,8 @@ create_trapezoid_tree(const std::vector<t_line>& _lines,
 				auto mid_trap_node = mid_trap_nodes[i];
 				auto mid_trap = mid_trap_node->GetTrapezoid();
 
-				auto mid_top_node = create_trapnode_if_unique(mid_top);
-				auto mid_bottom_node = create_trapnode_if_unique(mid_bottom);
+				auto mid_top_node = create_trapnode(mid_top);
+				auto mid_bottom_node = create_trapnode(mid_bottom);
 
 				auto mid_line_node = std::make_shared<TrapezoidNodeLine<t_vec>>(line);
 				if(!mid_top->IsEmpty(eps))
@@ -3839,9 +3815,9 @@ create_trapezoid_tree(const std::vector<t_line>& _lines,
 
 
 			// last trapezoid
-			auto last_right_node = create_trapnode_if_unique(last_right);
-			auto last_top_node = create_trapnode_if_unique(last_top);
-			auto last_bottom_node = create_trapnode_if_unique(last_bottom);
+			auto last_right_node = create_trapnode(last_right);
+			auto last_top_node = create_trapnode(last_top);
+			auto last_bottom_node = create_trapnode(last_bottom);
 
 			auto last_line_node = std::make_shared<TrapezoidNodeLine<t_vec>>(line);
 			if(!last_top->IsEmpty(eps))
