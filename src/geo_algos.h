@@ -3169,30 +3169,37 @@ std::shared_ptr<TrapezoidNodeTrapezoid<t_vec>> find_trapezoid(
 
 
 /**
- * replace old node pointers -> new node pointers
+ * replace old trapezoid node pointers -> new node pointers
  */
 template<class t_vec> requires m::is_vec<t_vec>
-void replace_trapezoid_node_ptr(std::shared_ptr<TrapezoidNode<t_vec>> node,
-	std::shared_ptr<TrapezoidNode<t_vec>> old_node,
+void replace_trapezoid_ptr(std::shared_ptr<TrapezoidNode<t_vec>> node,
+	std::shared_ptr<TrapezoidNodeTrapezoid<t_vec>> old_node,
 	std::shared_ptr<TrapezoidNode<t_vec>> new_node)
 {
-	if(old_node.get() == new_node.get())
-		return;
+	auto old_trap = old_node->GetTrapezoid();
 
-	if(node->GetLeft())
+	if(node->GetLeft()->GetType() == TrapezoidNodeType::TRAPEZOID)
 	{
-		if(node->GetLeft() == old_node)
+		auto trnode = std::dynamic_pointer_cast<TrapezoidNodeTrapezoid<t_vec>>(node->GetLeft());
+
+		if(trnode->GetTrapezoid() == old_trap)
 			node->SetLeft(new_node);
-		else
-			replace_trapezoid_node_ptr<t_vec>(node->GetLeft(), old_node, new_node);
+	}
+	else
+	{
+		replace_trapezoid_ptr<t_vec>(node->GetLeft(), old_node, new_node);
 	}
 
-	if(node->GetRight())
+	if(node->GetRight()->GetType() == TrapezoidNodeType::TRAPEZOID)
 	{
-		if(node->GetRight() == old_node)
+		auto trnode = std::dynamic_pointer_cast<TrapezoidNodeTrapezoid<t_vec>>(node->GetRight());
+
+		if(trnode->GetTrapezoid() == old_trap)
 			node->SetRight(new_node);
-		else
-			replace_trapezoid_node_ptr<t_vec>(node->GetRight(), old_node, new_node);
+	}
+	else
+	{
+		replace_trapezoid_ptr<t_vec>(node->GetRight(), old_node, new_node);
 	}
 }
 
@@ -3503,10 +3510,8 @@ create_trapezoid_tree(const std::vector<t_line>& _lines,
 
 			for(auto& line : lines)
 			{
-				//std::cout << std::get<0>(line)[0] << " " << std::get<0>(line)[1] << std::endl;
 				std::get<0>(line) = shear*std::get<0>(line);
 				std::get<1>(line) = shear*std::get<1>(line);
-				//std::cout << std::get<0>(line)[0] << " " << std::get<0>(line)[1] << std::endl;
 			}
 
 			++shear_mult;
@@ -3599,13 +3604,6 @@ create_trapezoid_tree(const std::vector<t_line>& _lines,
 			auto trap_top_node = create_trapnode(trap_top);
 			auto trap_bottom_node = create_trapnode(trap_bottom);
 
-			/*try_unite_trapezoids(&trap_left, &trap_top, eps);
-			try_unite_trapezoids(&trap_left, &trap_bottom, eps);
-			try_unite_trapezoids(&trap_top, &trap_bottom, eps);
-			try_unite_trapezoids(&trap_top, &trap_right, eps);
-			try_unite_trapezoids(&trap_right, &trap_bottom, eps);
-			try_unite_trapezoids(&trap_left, &trap_right, eps);*/
-
 			auto line_node = std::make_shared<TrapezoidNodeLine<t_vec>>(line);
 			if(!trap_top->IsEmpty(eps))
 				line_node->SetLeft(trap_top_node);
@@ -3632,7 +3630,7 @@ create_trapezoid_tree(const std::vector<t_line>& _lines,
 			else
 			{
 				// replace child node pointers
-				replace_trapezoid_node_ptr<t_vec>(root, cur_trap_node, leftpt_node);
+				replace_trapezoid_ptr<t_vec>(root, cur_trap_node, leftpt_node);
 			}
 		}
 		else if(intersecting_trapezoids.size() > 1)
@@ -3659,10 +3657,6 @@ create_trapezoid_tree(const std::vector<t_line>& _lines,
 			first_bottom->SetTopLine(line);
 			first_bottom->SetBottomLine(first_trap->GetBottomLine());
 
-			/*try_unite_trapezoids(&first_left, &first_top, eps);
-			try_unite_trapezoids(&first_left, &first_bottom, eps);
-			try_unite_trapezoids(&first_top, &first_bottom, eps);*/
-
 
 			// last trapezoid
 			auto last_trap_node = *intersecting_trapezoids.rbegin();
@@ -3686,10 +3680,6 @@ create_trapezoid_tree(const std::vector<t_line>& _lines,
 			last_bottom->SetTopLine(line);
 			last_bottom->SetBottomLine(last_trap->GetBottomLine());
 
-			/*try_unite_trapezoids(&last_right, &last_top, eps);
-			try_unite_trapezoids(&last_right, &last_bottom, eps);
-			try_unite_trapezoids(&last_top, &last_bottom, eps);*/
-
 
 			// mid trapezoids
 			std::vector<std::shared_ptr<Trapezoid<t_vec>>> mid_tops, mid_bottoms;
@@ -3712,41 +3702,30 @@ create_trapezoid_tree(const std::vector<t_line>& _lines,
 				mid_bottom->SetTopLine(line);
 				mid_bottom->SetBottomLine(mid_trap->GetBottomLine());
 
-				//try_unite_trapezoids(&mid_top, &mid_bottom, eps);
+				if(isect_idx > 1)
+				{
+					try_unite_trapezoids(&*mid_tops.rbegin(), &mid_top, eps);
+					try_unite_trapezoids(&*mid_bottoms.rbegin(), &mid_bottom , eps);
+				}
 
-				/*//if(isect_idx == 1)
+				if(isect_idx == 1)
 				{
 					try_unite_trapezoids(&first_top, &mid_top, eps);
 					try_unite_trapezoids(&first_bottom, &mid_bottom, eps);
-					try_unite_trapezoids(&first_top, &mid_bottom, eps);
-					try_unite_trapezoids(&first_bottom, &mid_top, eps);
-					try_unite_trapezoids(&first_left, &mid_top, eps);
-					try_unite_trapezoids(&first_left, &mid_bottom, eps);
 				}
-				//else if(isect_idx == intersecting_trapezoids.size()-2)
+				else if(isect_idx == intersecting_trapezoids.size()-2)
 				{
 					try_unite_trapezoids(&last_top, &mid_top, eps);
 					try_unite_trapezoids(&last_bottom, &mid_bottom, eps);
-					try_unite_trapezoids(&last_top, &mid_bottom, eps);
-					try_unite_trapezoids(&last_bottom, &mid_top, eps);
-					try_unite_trapezoids(&last_right, &mid_top, eps);
-					try_unite_trapezoids(&last_right, &mid_bottom, eps);
-				}*/
+				}
 
 				mid_tops.push_back(mid_top);
 				mid_bottoms.push_back(mid_bottom);
 				mid_trap_nodes.push_back(mid_trap_node);
 			}
 
-			/*try_unite_trapezoids(&first_top, &last_top, eps);
+			try_unite_trapezoids(&first_top, &last_top, eps);
 			try_unite_trapezoids(&first_bottom, &last_bottom, eps);
-			try_unite_trapezoids(&first_top, &last_bottom, eps);
-			try_unite_trapezoids(&first_bottom, &last_top, eps);
-			try_unite_trapezoids(&first_left, &last_top, eps);
-			try_unite_trapezoids(&first_left, &last_bottom, eps);
-			try_unite_trapezoids(&first_top, &last_right, eps);
-			try_unite_trapezoids(&first_bottom, &last_right, eps);
-			try_unite_trapezoids(&first_left, &last_right, eps);*/
 
 
 			// first trapezoid
@@ -3776,7 +3755,7 @@ create_trapezoid_tree(const std::vector<t_line>& _lines,
 			else
 			{
 				// replace child node pointers
-				replace_trapezoid_node_ptr<t_vec>(root, first_trap_node, first_leftpt_node);
+				replace_trapezoid_ptr<t_vec>(root, first_trap_node, first_leftpt_node);
 			}
 
 
@@ -3809,7 +3788,7 @@ create_trapezoid_tree(const std::vector<t_line>& _lines,
 				else
 				{
 					// replace child node pointers
-					replace_trapezoid_node_ptr<t_vec>(root, mid_trap_node, mid_line_node);
+					replace_trapezoid_ptr<t_vec>(root, mid_trap_node, mid_line_node);
 				}
 			}
 
@@ -3841,7 +3820,7 @@ create_trapezoid_tree(const std::vector<t_line>& _lines,
 			else
 			{
 				// replace child node pointers
-				replace_trapezoid_node_ptr<t_vec>(root, last_trap_node, last_rightpt_node);
+				replace_trapezoid_ptr<t_vec>(root, last_trap_node, last_rightpt_node);
 			}
 		}
 
