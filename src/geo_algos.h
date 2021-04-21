@@ -995,7 +995,7 @@ std::tuple<std::vector<t_vec>, std::vector<std::vector<t_vec>>, std::vector<std:
 calc_delaunay(int dim, const std::vector<t_vec>& verts, bool only_hull)
 requires m::is_vec<t_vec>
 {
-	using namespace m_ops;
+	//using namespace m_ops;
 	namespace qh = orgQhull;
 
 	using t_real = typename t_vec::value_type;
@@ -1055,7 +1055,8 @@ requires m::is_vec<t_vec>
 				thetriag.emplace_back(std::move(vec));
 			}
 
-			std::tie(thetriag, std::ignore) = sort_vertices_by_angle<t_vec>(thetriag);
+			if(dim == 2)
+				std::tie(thetriag, std::ignore) = sort_vertices_by_angle<t_vec>(thetriag);
 			triags.emplace_back(std::move(thetriag));
 		}
 
@@ -3379,9 +3380,12 @@ void save_trapezoid_svg(const std::shared_ptr<TrapezoidNode<t_vec>>& node,
 /**
  * check if the line segments share the same x coordinates
  */
-template<class t_vec, class t_line = std::pair<t_vec, t_vec>, class t_real = typename t_vec::value_type>
+template<class t_vec, class t_line = std::pair<t_vec, t_vec>,
+	class t_real = typename t_vec::value_type>
 requires m::is_vec<t_vec>
-bool check_line_equal_x(const std::vector<t_line>& lines, t_real eps=std::numeric_limits<t_real>::epsilon())
+bool check_line_equal_x(const std::vector<t_line>& lines,
+	bool exclude_duplicates = true,  // exclude coinciding points
+	t_real eps=std::numeric_limits<t_real>::epsilon())
 {
 	struct CompareReals
 	{
@@ -3402,12 +3406,34 @@ bool check_line_equal_x(const std::vector<t_line>& lines, t_real eps=std::numeri
 		t_real m_eps = std::numeric_limits<t_real>::epsilon();
 	};
 
-	std::set<t_real, CompareReals> cache_x0{CompareReals{eps}}, cache_x1{CompareReals{eps}};
+	std::vector<t_vec> alreadyseen0, alreadyseen1;
+	std::set<t_real, CompareReals> cache_x0{CompareReals{eps}},
+		cache_x1{CompareReals{eps}};
 
 	for(const t_line& line : lines)
 	{
-		t_real x0 = std::get<0>(line)[0];
-		t_real x1 = std::get<1>(line)[0];
+		const t_vec& pt0 = std::get<0>(line);
+		const t_vec& pt1 = std::get<1>(line);
+
+		if(exclude_duplicates)
+		{
+			if(std::find_if(alreadyseen0.begin(), alreadyseen0.end(),
+				[&pt0, eps](const t_vec& pt) -> bool
+				{
+					return m::equals<t_vec>(pt0, pt, eps);
+				}) != alreadyseen0.end())
+				continue;
+
+			if(std::find_if(alreadyseen1.begin(), alreadyseen1.end(),
+				[&pt1, eps](const t_vec& pt) -> bool
+				{
+					return m::equals<t_vec>(pt1, pt, eps);
+				}) != alreadyseen1.end())
+				continue;
+		}
+
+		t_real x0 = pt0[0];
+		t_real x1 = pt1[0];
 
 		if(cache_x0.find(x0) != cache_x0.end())
 			return true;
@@ -3416,6 +3442,12 @@ bool check_line_equal_x(const std::vector<t_line>& lines, t_real eps=std::numeri
 
 		cache_x0.insert(x0);
 		cache_x1.insert(x1);
+
+		if(exclude_duplicates)
+		{
+			alreadyseen0.push_back(pt0);
+			alreadyseen1.push_back(pt1);
+		}
 	}
 
 	return false;
@@ -3504,7 +3536,7 @@ create_trapezoid_tree(const std::vector<t_line>& _lines,
 	{
 		// shear until no more x coordinates coincide
 		t_real shear_mult = 1;
-		while(check_line_equal_x<t_vec>(lines, eps))
+		while(check_line_equal_x<t_vec>(lines, true, eps))
 		{
 			t_mat shear = m::shear<t_mat>(2, 2, 0, 1, shear_eps);
 

@@ -46,6 +46,18 @@ target_link_libraries(voro
 )
 
 
+add_executable(hull
+	src/gui/hull_gui.cpp src/gui/hull_gui.h
+	src/geo_algos.h src/math_algos.h
+)
+target_link_libraries(hull
+	Qt5::Core Qt5::Gui Qt5::Widgets Qt5::Svg
+	${Boost_LIBRARIES}
+	-lqhull_r -lqhullcpp
+	#-lqhullstatic_r -lqhullcpp
+)
+
+
 add_executable(vis
 	src/gui/vis_gui.cpp src/gui/vis_gui.h
 	src/geo_algos.h src/math_algos.h
