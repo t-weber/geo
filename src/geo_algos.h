@@ -3177,9 +3177,14 @@ void replace_trapezoid_ptr(std::shared_ptr<TrapezoidNode<t_vec>> node,
 	std::shared_ptr<TrapezoidNodeTrapezoid<t_vec>> old_node,
 	std::shared_ptr<TrapezoidNode<t_vec>> new_node)
 {
-	auto old_trap = old_node->GetTrapezoid();
+	if(!node || !old_node)
+		return;
 
-	if(node->GetLeft()->GetType() == TrapezoidNodeType::TRAPEZOID)
+	auto old_trap = old_node->GetTrapezoid();
+	if(!old_trap)
+		return;
+
+	if(node->GetLeft() && node->GetLeft()->GetType() == TrapezoidNodeType::TRAPEZOID)
 	{
 		auto trnode = std::dynamic_pointer_cast<TrapezoidNodeTrapezoid<t_vec>>(node->GetLeft());
 
@@ -3191,7 +3196,7 @@ void replace_trapezoid_ptr(std::shared_ptr<TrapezoidNode<t_vec>> node,
 		replace_trapezoid_ptr<t_vec>(node->GetLeft(), old_node, new_node);
 	}
 
-	if(node->GetRight()->GetType() == TrapezoidNodeType::TRAPEZOID)
+	if(node->GetRight() && node->GetRight()->GetType() == TrapezoidNodeType::TRAPEZOID)
 	{
 		auto trnode = std::dynamic_pointer_cast<TrapezoidNodeTrapezoid<t_vec>>(node->GetRight());
 
@@ -3738,17 +3743,23 @@ create_trapezoid_tree(const std::vector<t_line>& _lines,
 				{
 					try_unite_trapezoids(&*mid_tops.rbegin(), &mid_top, eps);
 					try_unite_trapezoids(&*mid_bottoms.rbegin(), &mid_bottom , eps);
+					try_unite_trapezoids(&*mid_tops.rbegin(), &mid_bottom, eps);
+					try_unite_trapezoids(&*mid_bottoms.rbegin(), &mid_top, eps);
 				}
 
 				if(isect_idx == 1)
 				{
 					try_unite_trapezoids(&first_top, &mid_top, eps);
 					try_unite_trapezoids(&first_bottom, &mid_bottom, eps);
+					try_unite_trapezoids(&first_top, &mid_bottom, eps);
+					try_unite_trapezoids(&first_bottom, &mid_top, eps);
 				}
 				else if(isect_idx == intersecting_trapezoids.size()-2)
 				{
 					try_unite_trapezoids(&last_top, &mid_top, eps);
 					try_unite_trapezoids(&last_bottom, &mid_bottom, eps);
+					try_unite_trapezoids(&last_top, &mid_bottom, eps);
+					try_unite_trapezoids(&last_bottom, &mid_top, eps);
 				}
 
 				mid_tops.push_back(mid_top);
@@ -3758,6 +3769,8 @@ create_trapezoid_tree(const std::vector<t_line>& _lines,
 
 			try_unite_trapezoids(&first_top, &last_top, eps);
 			try_unite_trapezoids(&first_bottom, &last_bottom, eps);
+			try_unite_trapezoids(&first_top, &last_bottom, eps);
+			try_unite_trapezoids(&first_bottom, &last_top, eps);
 
 
 			// first trapezoid
