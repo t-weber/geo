@@ -14,12 +14,8 @@
 
 #include <iostream>
 #include <fstream>
-#include <string>
-#include <tuple>
 
-#include <boost/function_output_iterator.hpp>
 #include <boost/geometry.hpp>
-#include <boost/geometry/strategies/transform.hpp>
 
 namespace geo = boost::geometry;
 namespace strat = geo::strategy::buffer;
@@ -54,6 +50,7 @@ int main()
 		strat::side_straight{}, strat::join_round{},
 		strat::end_round{}, strat::point_circle{});
 
+
 	// line
 	t_lines<t_real> line;
 	line.emplace_back(t_vertex<t_real>{-3., -2.});
@@ -81,12 +78,18 @@ int main()
 
 
 	// custom intersection calculation
-	auto custom_inters = m::intersect_circle_circle<t_vec>(
+	auto custom_inters_circle_circle = m::intersect_circle_circle<t_vec>(
 		m::create<t_vec>({1., 2.}), 2.5,
 		m::create<t_vec>({3.5, -0.5}), 3.);
 
+	auto custom_inters_line_circle = intersect_line_sphere<t_vec>(
+		m::create<t_vec>({-3., -2.}),
+		m::create<t_vec>({-3., -2.}) - m::create<t_vec>({5., 8.}),
+		m::create<t_vec>({1., 2.}), 2.5);
+
+
 	std::cout << "custom circle-circle intersection points:" << std::endl;
-	for(const t_vec& pt : custom_inters)
+	for(const t_vec& pt : custom_inters_circle_circle)
 	{
 		using namespace m_ops;
 		std::cout << "\t" << pt << std::endl;
@@ -95,9 +98,21 @@ int main()
 
 	std::cout << "boost::geo circle-circle intersection points:" << std::endl;
 	for(const auto& vert : inters_circle_circle)
-	{
 		std::cout << "\t" << geo::get<0>(vert) << "; " << geo::get<1>(vert) << std::endl;
+	std::cout << std::endl;
+
+	std::cout << "custom line-circle intersection points:" << std::endl;
+	for(const t_vec& pt : custom_inters_line_circle)
+	{
+		using namespace m_ops;
+		std::cout << "\t" << pt << std::endl;
 	}
+	std::cout << std::endl;
+
+	std::cout << "boost::geo line-circle intersection points:" << std::endl;
+	for(const auto& vert : inters_line_circle)
+		std::cout << "\t" << geo::get<0>(vert) << "; " << geo::get<1>(vert) << std::endl;
+	std::cout << std::endl;
 
 
 	// svg
@@ -137,12 +152,12 @@ int main()
 		svg1.text(vert, "inters.", "font-family:\'DejaVu Sans\'; font-size:4pt", 2., 2., 8.);
 	}
 
-	for(const t_vec& vec : custom_inters)
+	/*for(const t_vec& vec : custom_inters_circle_circle)
 	{
 		t_vertex<t_real> vert{vec[0], vec[1]};
 		svg1.add(vert);
 		svg1.map(vert, "stroke:#777700; stroke-width:1px; fill:#777700;", 1.);
-	}
+	}*/
 
 	return 0;
 }

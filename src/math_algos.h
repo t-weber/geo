@@ -1569,28 +1569,37 @@ requires is_vec<t_vec>
 template<class t_vec, template<class...> class t_cont = std::vector>
 t_cont<t_vec>
 intersect_line_sphere(
-	const t_vec& lineOrg, const t_vec& lineDir,
+	const t_vec& lineOrg, const t_vec& _lineDir,
 	const t_vec& sphereOrg, typename t_vec::value_type sphereRad,
-	bool bLineDirIsNormalised = false)
+	bool bLineDirIsNormalised = false,
+	typename t_vec::value_type eps = std::numeric_limits<typename t_vec::value_type>::epsilon())
 requires is_vec<t_vec>
 {
 	using T = typename t_vec::value_type;
 
-	auto vecDiff = sphereOrg-lineOrg;
-	auto proj = project_scalar<t_vec>(vecDiff, lineDir, bLineDirIsNormalised);
+	t_vec lineDir = _lineDir;
+	if(!bLineDirIsNormalised)
+		lineDir /= norm<t_vec>(lineDir);
+
+	auto vecDiff = sphereOrg - lineOrg;
+	auto proj = project_scalar<t_vec>(vecDiff, lineDir, true);
 	auto rt = proj*proj + sphereRad*sphereRad - inner<t_vec>(vecDiff, vecDiff);
 
 	// no intersection
-	if(rt < T(0)) return t_cont<t_vec>{};
+	if(rt < T(0))
+		return t_cont<t_vec>{};
 
 	// one intersection
-	if(equals(rt, T(0))) return t_cont<t_vec>{{ lineOrg + proj*lineDir }};
+	if(equals(rt, T(0), eps))
+		return t_cont<t_vec>{{ lineOrg + proj*lineDir }};
 
 	// two intersections
 	auto val = std::sqrt(rt);
-	auto lam1 = proj + val;
-	auto lam2 = proj - val;
-	return t_cont<t_vec>{{ lineOrg + lam1*lineDir, lineOrg + lam2*lineDir }};
+	return t_cont<t_vec>
+	{{
+		lineOrg + (proj + val)*lineDir,
+		lineOrg + (proj - val)*lineDir,
+	}};
 }
 
 
@@ -1612,10 +1621,17 @@ template<class t_vec, template<class...> class t_cont = std::vector>
 t_cont<t_vec>
 intersect_circle_circle(
 	const t_vec& org1, typename t_vec::value_type r1,
-	const t_vec& org2, typename t_vec::value_type r2)
+	const t_vec& org2, typename t_vec::value_type r2,
+	typename t_vec::value_type eps = std::sqrt(std::numeric_limits<typename t_vec::value_type>::epsilon()))
 requires is_vec<t_vec>
 {
 	using T = typename t_vec::value_type;
+
+	auto is_on_circle = [](const t_vec& org, T rad, const t_vec& pos, T eps) -> bool
+	{
+		T val = inner<t_vec>(org-pos, org-pos);
+		return equals<T>(val, rad*rad, eps);
+	};
 
 	T m1 = org2[0] - org1[0];
 	T m2 = org2[1] - org1[1];
@@ -1641,17 +1657,38 @@ requires is_vec<t_vec>
 
 	// first intersection
 	T x1 = (factors - rt) / div;
-	T y1 = -std::sqrt(r1_2 - x1*x1);
-	inters.emplace_back(m::create<t_vec>({x1, y1}) + org1);
+	T y1a = std::sqrt(r1_2 - x1*x1);
+	T y1b = -std::sqrt(r1_2 - x1*x1);
+
+	t_vec pos1a = m::create<t_vec>({x1, y1a}) + org1;
+	t_vec pos1b = m::create<t_vec>({x1, y1b}) + org1;
+
+	if(is_on_circle(org1, r1, pos1a, eps) && is_on_circle(org2, r2, pos1a, eps))
+		inters.emplace_back(std::move(pos1a));
+	if(!equals<t_vec>(pos1a, pos1b, eps) && is_on_circle(org1, r1, pos1b, eps) && is_on_circle(org2, r2, pos1b, eps))
+		inters.emplace_back(std::move(pos1b));
 
 	// second intersection
-	if(!equals<T>(rt, T(0)))
+	if(!equals<T>(rt, T(0), eps))
 	{
 		T x2 = (factors + rt) / div;
-		T y2 = std::sqrt(r1_2 - x2*x2);
-		inters.emplace_back(m::create<t_vec>({x2, y2}) + org1);
+		T y2a = std::sqrt(r1_2 - x2*x2);
+		T y2b = -std::sqrt(r1_2 - x2*x2);
+
+		t_vec pos2a = m::create<t_vec>({x2, y2a}) + org1;
+		t_vec pos2b = m::create<t_vec>({x2, y2b}) + org1;
+
+		if(is_on_circle(org1, r1, pos2a, eps) && is_on_circle(org2, r2, pos2a, eps))
+			inters.emplace_back(std::move(pos2a));
+		if(!equals<t_vec>(pos2a, pos2b, eps) && is_on_circle(org1, r1, pos2b, eps) && is_on_circle(org2, r2, pos2b, eps))
+			inters.emplace_back(std::move(pos2b));
 	}
 
+	// sort intersections by x
+	std::sort(inters.begin(), inters.end(), [](const t_vec& vec1, const t_vec& vec2) -> bool
+	{
+		return vec1[0] < vec2[0];
+	});
 	return inters;
 }
 
