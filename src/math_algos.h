@@ -1560,7 +1560,7 @@ requires is_vec<t_vec>
 
 
 /**
- * intersection of a sphere  and a line |org> + lam*|dir>
+ * intersection of a sphere and a line |org> + lam*|dir>
  * @returns vector of intersections
  * insert |x> = |org> + lam*|dir> in sphere equation <x-mid | x-mid> = r^2
  *
@@ -1591,6 +1591,68 @@ requires is_vec<t_vec>
 	auto lam1 = proj + val;
 	auto lam2 = proj - val;
 	return t_cont<t_vec>{{ lineOrg + lam1*lineDir, lineOrg + lam2*lineDir }};
+}
+
+
+/**
+ * intersection of two circles
+ * <x-mid_{1,2} | x-mid_{1,2}> = r_{1,2}^2
+ *
+ * circle 1:
+ * trafo to mid_1 = (0,0)
+ * x^2 + y^2 = r_1^2  ->  y = +-sqrt(r_1^2 - x^2)
+ *
+ * circle 2:
+ * (x-m_1)^2 + (y-m_2)^2 = r_2^2
+ * (x-m_1)^2 + (+-sqrt(r_1^2 - x^2)-m_2)^2 = r_2^2
+ *
+ * @see https://mathworld.wolfram.com/Circle-CircleIntersection.html
+ */
+template<class t_vec, template<class...> class t_cont = std::vector>
+t_cont<t_vec>
+intersect_circle_circle(
+	const t_vec& org1, typename t_vec::value_type r1,
+	const t_vec& org2, typename t_vec::value_type r2)
+requires is_vec<t_vec>
+{
+	using T = typename t_vec::value_type;
+
+	T m1 = org2[0] - org1[0];
+	T m2 = org2[1] - org1[1];
+
+	T r1_2 = r1*r1;
+	T r2_2 = r2*r2;
+	T m1_2 = m1*m1;
+	T m2_2 = m2*m2;
+	T m2_4 = m2_2*m2_2;
+
+	T rt =
+		+ T(2)*m2_2 * (r1_2*r2_2 + m1_2*(r1_2 + r2_2) + m2_2*(r1_2 + r2_2))
+		- m2_2 * (r1_2*r1_2 + r2_2*r2_2)
+		- (T(2)*m1_2*m2_4 + m1_2*m1_2*m2_2 + m2_4*m2_2);
+
+	t_cont<t_vec> inters;
+	if(rt < T(0))
+		return inters;
+
+	rt = std::sqrt(rt);
+	T factors = m1*(r1_2 - r2_2) + m1*m1_2 + m1*m2_2;
+	T div = T(2)*(m1_2 + m2_2);
+
+	// first intersection
+	T x1 = (factors - rt) / div;
+	T y1 = -std::sqrt(r1_2 - x1*x1);
+	inters.emplace_back(m::create<t_vec>({x1, y1}) + org1);
+
+	// second intersection
+	if(!equals<T>(rt, T(0)))
+	{
+		T x2 = (factors + rt) / div;
+		T y2 = std::sqrt(r1_2 - x2*x2);
+		inters.emplace_back(m::create<t_vec>({x2, y2}) + org1);
+	}
+
+	return inters;
 }
 
 
