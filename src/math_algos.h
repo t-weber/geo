@@ -1571,15 +1571,17 @@ t_cont<t_vec>
 intersect_line_sphere(
 	const t_vec& lineOrg, const t_vec& _lineDir,
 	const t_vec& sphereOrg, typename t_vec::value_type sphereRad,
-	bool bLineDirIsNormalised = false,
+	bool linedir_normalised = false, bool only_segment = false,
 	typename t_vec::value_type eps = std::numeric_limits<typename t_vec::value_type>::epsilon())
 requires is_vec<t_vec>
 {
 	using T = typename t_vec::value_type;
 
 	t_vec lineDir = _lineDir;
-	if(!bLineDirIsNormalised)
-		lineDir /= norm<t_vec>(lineDir);
+	T lenDir = linedir_normalised ? T(1) : norm<t_vec>(lineDir);
+
+	if(!linedir_normalised)
+		lineDir /= lenDir;
 
 	auto vecDiff = sphereOrg - lineOrg;
 	auto proj = project_scalar<t_vec>(vecDiff, lineDir, true);
@@ -1591,15 +1593,33 @@ requires is_vec<t_vec>
 
 	// one intersection
 	if(equals(rt, T(0), eps))
-		return t_cont<t_vec>{{ lineOrg + proj*lineDir }};
+	{
+		T lam = proj/lenDir;
+		if(!only_segment || (only_segment && lam >= T(0) && lam < T(1)))
+			return t_cont<t_vec>{{ lineOrg + proj*lineDir }};
+		return t_cont<t_vec>{};
+	}
 
 	// two intersections
 	auto val = std::sqrt(rt);
-	return t_cont<t_vec>
-	{{
-		lineOrg + (proj + val)*lineDir,
-		lineOrg + (proj - val)*lineDir,
-	}};
+	t_cont<t_vec> inters;
+
+	T lam1 = (proj + val)/lenDir;
+	T lam2 = (proj - val)/lenDir;
+	//std::cout << lam1 << "  " << lam2 << std::endl;
+
+	if(!only_segment || (only_segment && lam1 >= T(0) && lam1 < T(1)))
+		inters.emplace_back(lineOrg + (proj + val)*lineDir);
+	if(!only_segment || (only_segment && lam2 >= T(0) && lam2 < T(1)))
+		inters.emplace_back(lineOrg + (proj - val)*lineDir);
+
+	// sort intersections by x
+	std::sort(inters.begin(), inters.end(), [](const t_vec& vec1, const t_vec& vec2) -> bool
+	{
+		return vec1[0] < vec2[0];
+	});
+
+	return inters;
 }
 
 
