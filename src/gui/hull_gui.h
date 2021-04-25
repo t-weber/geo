@@ -72,7 +72,7 @@ class HullDlg : public QDialog
 {
 public:
 	HullDlg(QWidget* pParent = nullptr);
-	HullDlg(const HullDlg&) = default;
+	HullDlg(const HullDlg&) = delete;
 
 	virtual ~HullDlg() = default;
 
@@ -100,6 +100,11 @@ protected:
 
 	void TableCellChanged(int rowNew, int colNew, int rowOld, int colOld);
 	void ShowTableContextMenu(const QPoint& pt);
+
+
+private:
+	const HullDlg& operator=([[maybe_unused]] const HullDlg& dlg)
+	{ return *this; }
 
 
 private:

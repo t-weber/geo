@@ -312,7 +312,9 @@ std::vector<int> HullDlg::GetSelectedRows(bool sort_reversed) const
 }
 
 
-void HullDlg::TableCellChanged(int rowNew, int colNew, int rowOld, int colOld)
+void HullDlg::TableCellChanged(
+	[[maybe_unused] ]int rowNew, [[maybe_unused]] int colNew,
+	[[maybe_unused] ]int rowOld, [[maybe_unused]] int colOld)
 {
 	CalculateHull();
 }
