@@ -179,8 +179,8 @@ void LinesScene::UpdateLines()
 		t_vec vert2 = m::create<t_vec>({_vert2->x(), _vert2->y()});
 
 		// ensure that first vertex is on the left-hand side
-		if(vert1[0] > vert2[0])
-			std::swap(vert1, vert2);
+		//if(vert1[0] > vert2[0])
+		//	std::swap(vert1, vert2);
 
 		m_lines.emplace_back(std::make_pair(vert1, vert2));
 	}
