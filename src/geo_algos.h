@@ -2226,12 +2226,12 @@ std::vector<std::tuple<std::size_t, std::size_t, t_vec>> intersect_sweep(
 		events.pop();
 
 		curX = evt.x;
+
 		/*std::cout << "********* Event: "; evt.print(std::cout);
 		std::cout << ", line order: ";
 		for(auto theiter=status.begin(); theiter!=status.end(); theiter = std::next(theiter,1))
 			std::cout << theiter->line_idx << ", ";
 		std::cout << std::endl;*/
-
 
 		switch(evt.ty)
 		{
@@ -2351,6 +2351,19 @@ std::vector<std::tuple<std::size_t, std::size_t, t_vec>> intersect_sweep(
 				break;
 			}
 		}
+
+
+		// check leaf order
+		/*auto lastiter = status.begin();
+		for(auto theiter=status.begin(); theiter!=status.end(); theiter = std::next(theiter,1))
+		{
+			if(lastiter != theiter)
+			{
+				if(!cmp_line<t_vec, t_line>(lines[lastiter->line_idx], lines[theiter->line_idx], curX, eps))
+					std::cout << "Leaf order currupted in lines " << lastiter->line_idx << " and " << theiter->line_idx << std::endl;
+			}
+			lastiter = theiter;
+		}*/
 	}
 
 

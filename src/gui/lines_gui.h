@@ -52,7 +52,7 @@ public:
 	using t_vec = m::vec<t_real, std::vector>;
 	using t_mat = m::mat<t_real, std::vector>;
 
-	static const constexpr t_real g_eps = 1e-5;
+	static const constexpr t_real g_eps = 1e-4;
 
 public:
 	LinesScene(QWidget *parent=nullptr);
