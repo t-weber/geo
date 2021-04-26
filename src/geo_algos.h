@@ -2360,7 +2360,7 @@ std::vector<std::tuple<std::size_t, std::size_t, t_vec>> intersect_sweep(
 			if(lastiter != theiter)
 			{
 				if(!cmp_line<t_vec, t_line>(lines[lastiter->line_idx], lines[theiter->line_idx], curX, eps))
-					std::cout << "Leaf order currupted in lines " << lastiter->line_idx << " and " << theiter->line_idx << std::endl;
+					std::cout << "Leaf order corrupted in lines " << lastiter->line_idx << " and " << theiter->line_idx << std::endl;
 			}
 			lastiter = theiter;
 		}*/
