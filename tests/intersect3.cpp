@@ -118,7 +118,7 @@ int main()
 	{
 		t_vertex<t_real> vert{vec[0], vec[1]};
 		svg1.add(vert);
-		svg1.map(vert, "stroke:#777700; stroke-width:1px; fill:#777700;", 1.);
+		svg1.map(vert, "stroke:#0000ff; stroke-width:1px; fill:#0000ff;", 2.);
 	}
 	// ------------------------------------------------------------------------
 
