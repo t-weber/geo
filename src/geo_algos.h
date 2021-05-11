@@ -148,7 +148,25 @@ std::pair<bool, t_vec> intersect_lines(
 	if(only_segments && (param1<0. || param1>=1. || param2<0. || param2>=1.))
 		return std::make_pair(false, m::create<t_vec>({}));
 
-	return std::make_pair(true, pt1);
+	/*std::cout.precision(20);
+	std::cout << "intersection between line segment ";
+	print_line<t_vec>(std::cout, std::make_tuple(pos1a, pos1b));
+
+	std::cout << " and ";
+	print_line<t_vec>(std::cout, std::make_tuple(pos2a, pos2b));
+
+	std::cout << ": ";
+	print_point<t_vec>(std::cout, pt1);
+	std::cout << ", ";
+	print_point<t_vec>(std::cout, pt2);
+
+	std::cout << ", eps = " << eps << ".";
+	std::cout << std::endl;*/
+
+	// check if the intersection points on the two lines are the same
+	// to rule out numeric instability
+	bool alternatives_equal = m::equals<t_vec>(pt1, pt2, eps);
+	return std::make_pair(alternatives_equal, pt1);
 }
 
 
@@ -1941,9 +1959,9 @@ requires m::is_vec<t_vec>
 // @see (FUH 2020), ch. 2.3.2, pp. 69-80
 // ----------------------------------------------------------------------------
 
-template<class t_vec, class t_line = std::pair<t_vec, t_vec>>
+template<class t_vec, class t_line = std::pair<t_vec, t_vec>, class t_real = typename t_vec::value_type>
 std::vector<std::tuple<std::size_t, std::size_t, t_vec>>
-intersect_ineff(const std::vector<t_line>& lines)
+intersect_ineff(const std::vector<t_line>& lines, t_real eps = 1e-6)
 requires m::is_vec<t_vec>
 {
 	std::vector<std::tuple<std::size_t, std::size_t, t_vec>> intersections;
@@ -1955,7 +1973,7 @@ requires m::is_vec<t_vec>
 			const t_line& line1 = lines[i];
 			const t_line& line2 = lines[j];
 
-			if(auto [intersects, pt] = intersect_lines<t_line>(line1, line2); intersects)
+			if(auto [intersects, pt] = intersect_lines<t_line>(line1, line2, eps); intersects)
 				intersections.emplace_back(std::make_tuple(i, j, pt));
 		}
 	}
@@ -2359,8 +2377,22 @@ std::vector<std::tuple<std::size_t, std::size_t, t_vec>> intersect_sweep(
 		{
 			if(lastiter != theiter)
 			{
-				if(!cmp_line<t_vec, t_line>(lines[lastiter->line_idx], lines[theiter->line_idx], curX, eps))
-					std::cout << "Leaf order currupted in lines " << lastiter->line_idx << " and " << theiter->line_idx << std::endl;
+				if(!cmp_line<t_vec, t_line>(lines[lastiter->line_idx],
+					lines[theiter->line_idx], curX, eps))
+				{
+					std::cout << "Leaf order corrupted in lines " << lastiter->line_idx
+						<< " and " << theiter->line_idx << ": ";
+
+					const t_line& line1 = lines[lastiter->line_idx];
+					const t_line& line2 = lines[theiter->line_idx];
+					auto [slope1, offs1] = get_line_slope_offs<t_vec>(line1);
+					auto [slope2, offs2] = get_line_slope_offs<t_vec>(line2);
+					t_real line1_y = slope1*curX + offs1;
+					t_real line2_y = slope2*curX + offs2;
+
+					std::cout << "y1=" << line1_y << ", y2=" << line2_y
+						<< ", slope1=" << slope1 << ", slope2=" << slope2 << std::endl;
+				}
 			}
 			lastiter = theiter;
 		}*/
