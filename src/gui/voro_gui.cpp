@@ -285,7 +285,7 @@ void HullScene::UpdateDelaunay()
 	std::vector<t_vec> vertices;
 	vertices.reserve(m_vertices.size());
 	std::transform(m_vertices.begin(), m_vertices.end(), std::back_inserter(vertices),
-				   [](const Vertex* vert) -> t_vec { return m::create<t_vec>({vert->x(), vert->y()}); } );
+		[](const Vertex* vert) -> t_vec { return m::create<t_vec>({vert->x(), vert->y()}); } );
 
 
 	std::vector<t_vec> voronoi{};

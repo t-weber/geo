@@ -150,6 +150,7 @@ void LinesScene::UpdateAll()
 {
 	UpdateLines();
 	UpdateIntersections();
+	UpdateVoro();
 }
 
 
@@ -252,7 +253,7 @@ void LinesScene::UpdateIntersections()
 }
 
 
-void LinesScene::UpdateVoro(const QTransform& trafoSceneToVP)
+void LinesScene::UpdateVoroImage(const QTransform& trafoSceneToVP)
 {
 	QTransform trafoVPToScene = trafoSceneToVP.inverted();
 
@@ -349,6 +350,37 @@ std::size_t LinesScene::GetClosestLineIdx(const t_vec& pt) const
 	}
 
 	return minidx;
+}
+
+
+void LinesScene::UpdateVoro()
+{
+	// remove previous voronoi diagram
+	for(QGraphicsItem* item : m_elems_voro)
+	{
+		removeItem(item);
+		delete item;
+	}
+	m_elems_voro.clear();
+
+	if(!m_calcvoro)
+		return;
+
+	auto [linear_edges] = g::calc_voro<t_vec>(m_lines);
+
+	QPen penLinEdge;
+	penLinEdge.setStyle(Qt::SolidLine);
+	penLinEdge.setWidthF(1.);
+	penLinEdge.setColor(QColor::fromRgbF(0.,0.,0.));
+
+	for(const auto& linear_edge : linear_edges)
+	{
+		QLineF line{
+			QPointF{std::get<0>(linear_edge)[0], std::get<0>(linear_edge)[1]},
+			QPointF{std::get<1>(linear_edge)[0], std::get<1>(linear_edge)[1]} };
+		QGraphicsItem *item = addLine(line, penLinEdge);
+		m_elems_voro.push_back(item);
+	}
 }
 
 // ----------------------------------------------------------------------------
@@ -551,7 +583,7 @@ LinesWnd::LinesWnd(QWidget* pParent) : QMainWindow{pParent},
 
 	m_view->setRenderHints(QPainter::Antialiasing);
 
-	setWindowTitle("Line Intersections");
+	setWindowTitle("Line Segments");
 	setCentralWidget(m_view.get());
 
 	QStatusBar *statusBar = new QStatusBar{this};
@@ -663,10 +695,19 @@ LinesWnd::LinesWnd(QWidget* pParent) : QMainWindow{pParent},
 	connect(actionQuit, &QAction::triggered, [this]() { this->close(); });
 
 
-	QAction *actionVoro = new QAction{"Voronoi Regions", this};
-	connect(actionVoro, &QAction::triggered, [this]()
+	QAction *actionVoronoiRegions = new QAction{"Voronoi Regions", this};
+	actionVoronoiRegions->setCheckable(true);
+	actionVoronoiRegions->setChecked(true);
+	connect(actionVoronoiRegions, &QAction::toggled, [this](bool b)
 	{
-		m_scene->UpdateVoro(m_view->viewportTransform());
+		m_scene->SetCalcVoro(b);
+		m_scene->UpdateVoro();
+	});
+
+	QAction *actionVoronoiRegionsPixel = new QAction{"Voronoi Regions (Pixel-Wise)", this};
+	connect(actionVoronoiRegionsPixel, &QAction::triggered, [this]()
+	{
+		m_scene->UpdateVoroImage(m_view->viewportTransform());
 	});
 
 
@@ -702,7 +743,9 @@ LinesWnd::LinesWnd(QWidget* pParent) : QMainWindow{pParent},
 	menuFile->addSeparator();
 	menuFile->addAction(actionQuit);
 
-	menuCalc->addAction(actionVoro);
+	menuCalc->addAction(actionVoronoiRegions);
+	menuCalc->addSeparator();
+	menuCalc->addAction(actionVoronoiRegionsPixel);
 
 	menuBack->addAction(actionIntersDirect);
 	menuBack->addAction(actionIntersSweep);

@@ -74,16 +74,21 @@ public:
 	void SetIntersectionCalculationMethod(IntersectionCalculationMethod m);
 
 	void CreateVoroImage(int width, int height);
-	void UpdateVoro(const QTransform& trafoSceneToVP);
+	void UpdateVoroImage(const QTransform& trafoSceneToVP);
 	const QImage* GetVoroImage() const { return m_elem_voro; }
+
+	void SetCalcVoro(bool b) { m_calcvoro = b; }
+	void UpdateVoro();
 
 private:
 	QWidget *m_parent = nullptr;
 
 	std::vector<Vertex*> m_elems_vertices{};
-	std::vector<QGraphicsItem*> m_elems_lines{}, m_elems_inters{};
+	std::vector<QGraphicsItem*> m_elems_lines{}, m_elems_inters{}, m_elems_voro{};
 	QImage *m_elem_voro = nullptr;
 	std::vector<std::pair<t_vec, t_vec>> m_lines{};
+
+	bool m_calcvoro = true;
 
 	IntersectionCalculationMethod m_intersectioncalculationmethod = IntersectionCalculationMethod::SWEEP;
 

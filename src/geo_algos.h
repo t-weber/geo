@@ -41,12 +41,67 @@
 #include <boost/geometry.hpp>
 #include <boost/geometry/index/rtree.hpp>
 
+#include <boost/polygon/voronoi.hpp>
+
 #include <libqhullcpp/Qhull.h>
 #include <libqhullcpp/QhullFacet.h>
 #include <libqhullcpp/QhullRidge.h>
 #include <libqhullcpp/QhullFacetList.h>
 #include <libqhullcpp/QhullFacetSet.h>
 #include <libqhullcpp/QhullVertexSet.h>
+
+
+
+// ----------------------------------------------------------------------------
+// make point and line segment classes known for boost.polygon
+// @see https://www.boost.org/doc/libs/1_75_0/libs/polygon/doc/gtl_custom_point.htm
+// @see https://github.com/boostorg/polygon/blob/develop/example/voronoi_basic_tutorial.cpp
+// ----------------------------------------------------------------------------
+
+template<class t_vec> requires m::is_vec<t_vec>
+struct boost::polygon::geometry_concept<t_vec>
+{
+	using type = boost::polygon::point_concept;
+};
+
+
+template<class t_vec> requires m::is_vec<t_vec>
+struct boost::polygon::geometry_concept<std::pair<t_vec, t_vec>>
+{
+	using type = boost::polygon::segment_concept;
+};
+
+
+template<class t_vec> requires m::is_vec<t_vec>
+struct boost::polygon::point_traits<t_vec>
+{
+	using coordinate_type = typename t_vec::value_type;
+
+	static coordinate_type get(const t_vec& vec, boost::polygon::orientation_2d orientation)
+	{
+		return vec[orientation.to_int()];
+	}
+};
+
+
+template<class t_vec> requires m::is_vec<t_vec>
+struct boost::polygon::segment_traits<std::pair<t_vec, t_vec>>
+{
+	using coordinate_type = typename t_vec::value_type;
+	using point_type = t_vec;
+	using line_type = std::pair<t_vec, t_vec>; // for convenience, not part of interface
+
+	static const point_type& get(const line_type& line, boost::polygon::direction_1d direction)
+	{
+		switch(direction.to_int())
+		{
+			case 1: return std::get<1>(line);
+			case 0: default: return std::get<0>(line);
+		}
+	}
+};
+// ----------------------------------------------------------------------------
+
 
 
 // geo
@@ -1098,10 +1153,60 @@ requires m::is_vec<t_vec>
 
 
 // ----------------------------------------------------------------------------
-// delaunay triangulation
+// delaunay triangulation / voronoi regions
 // @see (Klein 2005), ch. 6, pp. 269f
 // @see (FUH 2020), ch. 5.3, pp. 228-232
 // ----------------------------------------------------------------------------
+
+/**
+ * voronoi diagram for line segments
+ * @see https://github.com/boostorg/polygon/blob/develop/example/voronoi_basic_tutorial.cpp
+ * @see https://github.com/boostorg/polygon/blob/develop/example/voronoi_visual_utils.hpp
+ * @see https://github.com/boostorg/polygon/blob/develop/example/voronoi_visualizer.cpp
+ * @see https://www.boost.org/doc/libs/1_75_0/libs/polygon/doc/voronoi_diagram.htm
+ */
+template<class t_vec, class t_line = std::pair<t_vec, t_vec>>
+std::tuple<std::vector<t_line>>
+calc_voro(const std::vector<t_line>& lines)
+requires m::is_vec<t_vec>
+{
+	using t_real = typename t_vec::value_type;
+	namespace poly = boost::polygon;
+
+	poly::voronoi_diagram<t_real> voro;
+	poly::construct_voronoi(lines.begin(), lines.end(), &voro);
+
+	std::vector<t_line> linear_edges;
+	linear_edges.reserve(voro.edges().size());
+
+	for(const auto& edge : voro.edges())
+	{
+		// only bisectors, no internal edges
+		if(edge.is_secondary())
+			continue;
+
+		if(edge.is_finite())
+		{
+			// parabolic edge
+			if(edge.is_curved())
+			{
+				// TODO
+			}
+
+			// linear edge
+			else
+			{
+				t_vec vertex0 = m::create<t_vec>({ edge.vertex0()->x(), edge.vertex0()->y() });
+				t_vec vertex1 = m::create<t_vec>({ edge.vertex1()->x(), edge.vertex1()->y() });
+				linear_edges.push_back(std::make_pair(vertex0, vertex1));
+			}
+		}
+	}
+
+	return std::make_tuple(linear_edges);
+}
+
+
 
 /**
  * delaunay triangulation and voronoi vertices
@@ -1250,6 +1355,7 @@ requires m::is_vec<t_vec>
 	// no shared edge found
 	return std::nullopt;
 }
+
 
 
 template<class t_vec, class t_real = typename t_vec::value_type>
