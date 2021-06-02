@@ -29,6 +29,7 @@ add_definitions(${Boost_CXX_FLAGS})
 
 include_directories(
 	${PROJECT_SOURCE_DIR} ${PROJECT_SOURCE_DIR}/src
+	${PROJECT_SOURCE_DIR}/ext
 	${Boost_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS}/..
 	${Qt5Svg_INCLUDE_DIRS}
 )

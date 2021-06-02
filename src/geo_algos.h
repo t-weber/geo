@@ -42,6 +42,7 @@
 #include <boost/geometry/index/rtree.hpp>
 
 #include <boost/polygon/voronoi.hpp>
+//#include <voronoi_visual_utils.hpp>
 
 #include <libqhullcpp/Qhull.h>
 #include <libqhullcpp/QhullFacet.h>
@@ -1173,7 +1174,18 @@ requires m::is_vec<t_vec>
 	using t_real = typename t_vec::value_type;
 	namespace poly = boost::polygon;
 
-	poly::voronoi_diagram<t_real> voro;
+	// length of infinite edges
+	t_real infline_len = 1.;
+	for(const t_line& line : lines)
+	{
+		t_vec dir = std::get<1>(line) - std::get<0>(line);
+		t_real len = m::norm(dir);
+		infline_len = std::max(infline_len, len);
+	}
+	infline_len *= 10.;
+
+	using t_vorotraits = poly::voronoi_diagram_traits<t_real>;
+	poly::voronoi_diagram<t_real, t_vorotraits> voro;
 	poly::construct_voronoi(lines.begin(), lines.end(), &voro);
 
 	std::vector<t_line> linear_edges;
@@ -1185,20 +1197,88 @@ requires m::is_vec<t_vec>
 		if(edge.is_secondary())
 			continue;
 
-		if(edge.is_finite())
+		// parabolic edge
+		if(edge.is_curved())
 		{
-			// parabolic edge
-			if(edge.is_curved())
-			{
-				// TODO
-			}
+			// TODO
 
-			// linear edge
-			else
+			//typename t_vorotraits::vertex_type vec;
+			//poly::segment_data<t_real> line;
+			//std::vector<typename t_vorotraits::vertex_type> parabola;
+
+			//poly::voronoi_visual_utils<t_real>::discretize(vec, line, 1., &parabola);
+		}
+
+		// linear edge
+		else
+		{
+			// finite edge
+			if(edge.is_finite())
 			{
 				t_vec vertex0 = m::create<t_vec>({ edge.vertex0()->x(), edge.vertex0()->y() });
 				t_vec vertex1 = m::create<t_vec>({ edge.vertex1()->x(), edge.vertex1()->y() });
+
 				linear_edges.push_back(std::make_pair(vertex0, vertex1));
+			}
+
+			// infinite edge
+			else
+			{
+				t_vec lineorg;
+				bool inverted = false;
+				if(edge.vertex0())
+				{
+					lineorg = m::create<t_vec>({ edge.vertex0()->x(), edge.vertex0()->y() });
+					inverted = false;
+				}
+				else if(edge.vertex1())
+				{
+					lineorg = m::create<t_vec>({ edge.vertex1()->x(), edge.vertex1()->y() });
+					inverted = true;
+				}
+				else
+				{
+					continue;
+				}
+
+				// get line segment endpoint
+				auto get_segment_point = [&edge, &lines](bool twin) -> const t_vec*
+				{
+					const auto* cell = twin ? edge.twin()->cell() : edge.cell();
+
+					const t_line& line = lines[cell->source_index()];
+					const t_vec* vec = nullptr;
+
+					switch(cell->source_category())
+					{
+						case poly::SOURCE_CATEGORY_SEGMENT_START_POINT:
+							vec = &std::get<0>(line);
+							break;
+						case poly::SOURCE_CATEGORY_SEGMENT_END_POINT:
+							vec = &std::get<1>(line);
+							break;
+						default:
+							break;
+					}
+
+					return vec;
+				};
+
+				const t_vec* vec = get_segment_point(false);
+				const t_vec* twinvec = get_segment_point(true);
+
+				if(!vec || !twinvec)
+					continue;
+
+				t_vec perpdir = *vec - *twinvec;
+				if(inverted)
+					perpdir = -perpdir;
+				t_vec linedir = m::create<t_vec>({ perpdir[1], -perpdir[0] });
+
+				linedir /= m::norm(linedir);
+				linedir *= infline_len;
+
+				linear_edges.push_back(std::make_pair(lineorg, lineorg + linedir));
 			}
 		}
 	}
