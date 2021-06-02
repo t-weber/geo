@@ -366,8 +366,9 @@ void LinesScene::UpdateVoro()
 	if(!m_calcvoro)
 		return;
 
-	auto [linear_edges] = g::calc_voro<t_vec>(m_lines);
+	auto [linear_edges, all_parabolic_edges] = g::calc_voro<t_vec>(m_lines);
 
+	// linear edges
 	QPen penLinEdge;
 	penLinEdge.setStyle(Qt::SolidLine);
 	penLinEdge.setWidthF(1.);
@@ -379,6 +380,23 @@ void LinesScene::UpdateVoro()
 			QPointF{std::get<0>(linear_edge)[0], std::get<0>(linear_edge)[1]},
 			QPointF{std::get<1>(linear_edge)[0], std::get<1>(linear_edge)[1]} };
 		QGraphicsItem *item = addLine(line, penLinEdge);
+		m_elems_voro.push_back(item);
+	}
+
+	// parabolic edges
+	QPen penParaEdge = penLinEdge;
+
+	for(const auto& parabolic_edges : all_parabolic_edges)
+	{
+		QPolygonF poly;
+		poly.reserve(parabolic_edges.size());
+		for(const auto& parabolic_edge : parabolic_edges)
+			poly << QPointF{parabolic_edge[0], parabolic_edge[1]};
+
+		QPainterPath path;
+		path.addPolygon(poly);
+
+		QGraphicsItem *item = addPath(path, penParaEdge);
 		m_elems_voro.push_back(item);
 	}
 }

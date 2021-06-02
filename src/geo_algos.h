@@ -41,8 +41,15 @@
 #include <boost/geometry.hpp>
 #include <boost/geometry/index/rtree.hpp>
 
-#include <boost/polygon/voronoi.hpp>
-//#include <voronoi_visual_utils.hpp>
+#if !__has_include(<voronoi_visual_utils.hpp>)
+	#pragma message("Boost.Polygon's voronoi_visual_utils2.hpp utility header was not found, disabling.")
+#else
+	#include <boost/polygon/polygon.hpp>
+	#include <boost/polygon/voronoi.hpp>
+	#include <voronoi_visual_utils.hpp>
+
+	#define __GEO2D_USE_BOOST_POLY__
+#endif
 
 #include <libqhullcpp/Qhull.h>
 #include <libqhullcpp/QhullFacet.h>
@@ -58,6 +65,7 @@
 // @see https://www.boost.org/doc/libs/1_75_0/libs/polygon/doc/gtl_custom_point.htm
 // @see https://github.com/boostorg/polygon/blob/develop/example/voronoi_basic_tutorial.cpp
 // ----------------------------------------------------------------------------
+#ifdef __GEO2D_USE_BOOST_POLY__
 
 template<class t_vec> requires m::is_vec<t_vec>
 struct boost::polygon::geometry_concept<t_vec>
@@ -101,6 +109,8 @@ struct boost::polygon::segment_traits<std::pair<t_vec, t_vec>>
 		}
 	}
 };
+
+#endif
 // ----------------------------------------------------------------------------
 
 
@@ -1167,12 +1177,15 @@ requires m::is_vec<t_vec>
  * @see https://www.boost.org/doc/libs/1_75_0/libs/polygon/doc/voronoi_diagram.htm
  */
 template<class t_vec, class t_line = std::pair<t_vec, t_vec>>
-std::tuple<std::vector<t_line>>
+std::tuple<std::vector<t_line>, std::vector<std::vector<t_vec>>>
 calc_voro(const std::vector<t_line>& lines)
 requires m::is_vec<t_vec>
 {
+#ifdef __GEO2D_USE_BOOST_POLY__
 	using t_real = typename t_vec::value_type;
 	namespace poly = boost::polygon;
+
+	t_real parabola_eps = 1e-3;
 
 	// length of infinite edges
 	t_real infline_len = 1.;
@@ -1188,6 +1201,7 @@ requires m::is_vec<t_vec>
 	poly::voronoi_diagram<t_real, t_vorotraits> voro;
 	poly::construct_voronoi(lines.begin(), lines.end(), &voro);
 
+	std::vector<std::vector<t_vec>> all_parabolic_edges;
 	std::vector<t_line> linear_edges;
 	linear_edges.reserve(voro.edges().size());
 
@@ -1197,16 +1211,97 @@ requires m::is_vec<t_vec>
 		if(edge.is_secondary())
 			continue;
 
+
+		// get line segment
+		auto get_segment = [&edge, &lines](bool twin) -> const t_line*
+		{
+			const auto* cell = twin ? edge.twin()->cell() : edge.cell();
+			if(!cell)
+				return nullptr;
+
+			const t_line& line = lines[cell->source_index()];
+			return &line;
+		};
+
+
+		// get line segment endpoint
+		auto get_segment_point = [&edge, &lines, &get_segment](bool twin) -> const t_vec*
+		{
+			const auto* cell = twin ? edge.twin()->cell() : edge.cell();
+			if(!cell)
+				return nullptr;
+
+			const t_line* line = get_segment(twin);
+			const t_vec* vec = nullptr;
+			if(!line)
+				return nullptr;
+
+			switch(cell->source_category())
+			{
+				case poly::SOURCE_CATEGORY_SEGMENT_START_POINT:
+					vec = &std::get<0>(*line);
+					break;
+				case poly::SOURCE_CATEGORY_SEGMENT_END_POINT:
+					vec = &std::get<1>(*line);
+					break;
+				default:
+					break;
+			}
+
+			return vec;
+		};
+
+
+		// converter functions
+		auto to_point_data = [](const t_vec& vec) -> poly::point_data<t_real>
+		{
+			return poly::point_data<t_real>{vec[0], vec[1]};
+		};
+
+		auto vertex_to_point_data = [](const typename t_vorotraits::vertex_type& vec) -> poly::point_data<t_real>
+		{
+			return poly::point_data<t_real>{vec.x(), vec.y()};
+		};
+
+		auto to_vec = [](const poly::point_data<t_real>& pt) -> t_vec
+		{
+			return m::create<t_vec>({ pt.x(), pt.y() });
+		};
+
+		auto vertex_to_vec = [](const typename t_vorotraits::vertex_type& vec) -> t_vec
+		{
+			return m::create<t_vec>({ vec.x(), vec.y() });
+		};
+
+		auto to_segment_data = [&to_point_data](const t_line& line) -> poly::segment_data<t_real>
+		{
+			auto pt1 = to_point_data(std::get<0>(line));
+			auto pt2 = to_point_data(std::get<1>(line));
+
+			return poly::segment_data<t_real>{pt1, pt2};
+		};
+
+
 		// parabolic edge
 		if(edge.is_curved())
 		{
-			// TODO
+			const t_line* seg = get_segment(edge.cell()->contains_point());
+			const t_vec* pt = get_segment_point(!edge.cell()->contains_point());
+			if(!seg || !pt)
+				continue;
 
-			//typename t_vorotraits::vertex_type vec;
-			//poly::segment_data<t_real> line;
-			//std::vector<typename t_vorotraits::vertex_type> parabola;
+			std::vector<poly::point_data<t_real>> parabola
+				{{ vertex_to_point_data(*edge.vertex0()), vertex_to_point_data(*edge.vertex1()) }};
 
-			//poly::voronoi_visual_utils<t_real>::discretize(vec, line, 1., &parabola);
+			poly::voronoi_visual_utils<t_real>::discretize(
+				to_point_data(*pt), to_segment_data(*seg),
+				parabola_eps, &parabola);
+
+			std::vector<t_vec> parabolic_edges;
+			parabolic_edges.reserve(parabola.size());
+			for(const auto& parabola_pt : parabola)
+				parabolic_edges.emplace_back(to_vec(parabola_pt));
+			all_parabolic_edges.emplace_back(std::move(parabolic_edges));
 		}
 
 		// linear edge
@@ -1215,10 +1310,8 @@ requires m::is_vec<t_vec>
 			// finite edge
 			if(edge.is_finite())
 			{
-				t_vec vertex0 = m::create<t_vec>({ edge.vertex0()->x(), edge.vertex0()->y() });
-				t_vec vertex1 = m::create<t_vec>({ edge.vertex1()->x(), edge.vertex1()->y() });
-
-				linear_edges.push_back(std::make_pair(vertex0, vertex1));
+				linear_edges.push_back(std::make_pair(
+					vertex_to_vec(*edge.vertex0()), vertex_to_vec(*edge.vertex1())));
 			}
 
 			// infinite edge
@@ -1228,41 +1321,18 @@ requires m::is_vec<t_vec>
 				bool inverted = false;
 				if(edge.vertex0())
 				{
-					lineorg = m::create<t_vec>({ edge.vertex0()->x(), edge.vertex0()->y() });
+					lineorg = vertex_to_vec(*edge.vertex0());
 					inverted = false;
 				}
 				else if(edge.vertex1())
 				{
-					lineorg = m::create<t_vec>({ edge.vertex1()->x(), edge.vertex1()->y() });
+					lineorg = vertex_to_vec(*edge.vertex1());
 					inverted = true;
 				}
 				else
 				{
 					continue;
 				}
-
-				// get line segment endpoint
-				auto get_segment_point = [&edge, &lines](bool twin) -> const t_vec*
-				{
-					const auto* cell = twin ? edge.twin()->cell() : edge.cell();
-
-					const t_line& line = lines[cell->source_index()];
-					const t_vec* vec = nullptr;
-
-					switch(cell->source_category())
-					{
-						case poly::SOURCE_CATEGORY_SEGMENT_START_POINT:
-							vec = &std::get<0>(line);
-							break;
-						case poly::SOURCE_CATEGORY_SEGMENT_END_POINT:
-							vec = &std::get<1>(line);
-							break;
-						default:
-							break;
-					}
-
-					return vec;
-				};
 
 				const t_vec* vec = get_segment_point(false);
 				const t_vec* twinvec = get_segment_point(true);
@@ -1283,7 +1353,14 @@ requires m::is_vec<t_vec>
 		}
 	}
 
-	return std::make_tuple(linear_edges);
+	return std::make_tuple(linear_edges, all_parabolic_edges);
+
+#else
+
+	// disable function
+	return std::make_tuple(std::vector<t_line>{}, std::vector<std::vector<t_vec>>{});
+
+#endif
 }
 
 
