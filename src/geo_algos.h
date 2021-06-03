@@ -28,8 +28,10 @@
 #include <fstream>
 
 #include "math_algos.h"
+#include "graph_algos.h"
 #include "math_conts.h"
 #include "geo_conts.h"
+#include "graph_conts.h"
 #include "helpers.h"
 
 #include <boost/intrusive/bstree.hpp>
@@ -1176,10 +1178,10 @@ requires m::is_vec<t_vec>
  * @see https://github.com/boostorg/polygon/blob/develop/example/voronoi_visualizer.cpp
  * @see https://www.boost.org/doc/libs/1_75_0/libs/polygon/doc/voronoi_diagram.htm
  */
-template<class t_vec, class t_line = std::pair<t_vec, t_vec>>
-std::tuple<std::vector<t_line>, std::vector<std::vector<t_vec>>>
+template<class t_vec, class t_line=std::pair<t_vec, t_vec>, class t_graph=adjacency_matrix<typename t_vec::value_type>>
+std::tuple<std::vector<t_vec>, std::vector<t_line>, std::vector<std::vector<t_vec>>, t_graph>
 calc_voro(const std::vector<t_line>& lines)
-requires m::is_vec<t_vec>
+requires m::is_vec<t_vec> && is_graph<t_graph>
 {
 #ifdef __GEO2D_USE_BOOST_POLY__
 	using t_real = typename t_vec::value_type;
@@ -1201,6 +1203,37 @@ requires m::is_vec<t_vec>
 	poly::voronoi_diagram<t_real, t_vorotraits> voro;
 	poly::construct_voronoi(lines.begin(), lines.end(), &voro);
 
+	// graph of voronoi vertices
+	t_graph graph;
+
+	//vertices
+	std::vector<t_vec> vertices;
+	for(const auto& vert : voro.vertices())
+	{
+		vertices.emplace_back(m::create<t_vec>({ vert.x(), vert.y() }));
+		graph.AddVertex(std::to_string(vertices.size()));
+	}
+
+
+	auto get_vertex_idx = [&voro](const typename t_vorotraits::vertex_type* vert) -> std::optional<std::size_t>
+	{
+		// infinite edge?
+		if(!vert)
+			return std::nullopt;
+
+		std::size_t idx = 0;
+		for(const auto& vertex : voro.vertices())
+		{
+			if(&vertex == vert)
+				return idx;
+			++idx;
+		}
+
+		return std::nullopt;
+	};
+
+
+	// edges
 	std::vector<std::vector<t_vec>> all_parabolic_edges;
 	std::vector<t_line> linear_edges;
 	linear_edges.reserve(voro.edges().size());
@@ -1211,6 +1244,18 @@ requires m::is_vec<t_vec>
 		if(edge.is_secondary())
 			continue;
 
+		// add graph edges
+		const auto* vert0 = edge.vertex0();
+		const auto* vert1 = edge.vertex1();
+		auto vert0idx = get_vertex_idx(vert0);
+		auto vert1idx = get_vertex_idx(vert1);
+		if(vert0idx && vert1idx)
+		{
+			// TODO: arc length of parabolic edges
+			t_real len = m::norm(vertices[*vert1idx] - vertices[*vert0idx]);
+			graph.AddEdge(*vert0idx, *vert1idx, len);
+			graph.AddEdge(*vert1idx, *vert0idx, len);
+		}
 
 		// get line segment
 		auto get_segment = [&edge, &lines](bool twin) -> const t_line*
@@ -1225,7 +1270,7 @@ requires m::is_vec<t_vec>
 
 
 		// get line segment endpoint
-		auto get_segment_point = [&edge, &lines, &get_segment](bool twin) -> const t_vec*
+		auto get_segment_point = [&edge, &get_segment](bool twin) -> const t_vec*
 		{
 			const auto* cell = twin ? edge.twin()->cell() : edge.cell();
 			if(!cell)
@@ -1353,12 +1398,14 @@ requires m::is_vec<t_vec>
 		}
 	}
 
-	return std::make_tuple(linear_edges, all_parabolic_edges);
+	return std::make_tuple(vertices, linear_edges, all_parabolic_edges, graph);
 
 #else
 
 	// disable function
-	return std::make_tuple(std::vector<t_line>{}, std::vector<std::vector<t_vec>>{});
+	return std::make_tuple(std::vector<t_vec>{},
+		std::vector<t_line>{}, std::vector<std::vector<t_vec>>{},
+		t_graph{});
 
 #endif
 }

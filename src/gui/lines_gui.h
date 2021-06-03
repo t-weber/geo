@@ -51,6 +51,8 @@ class LinesScene : public QGraphicsScene
 public:
 	using t_vec = m::vec<t_real, std::vector>;
 	using t_mat = m::mat<t_real, std::vector>;
+	//using t_graph = adjacency_matrix<t_real>;
+	using t_graph = adjacency_list<t_real>;
 
 	static const constexpr t_real g_eps = 1e-4;
 
@@ -79,6 +81,7 @@ public:
 
 	void SetCalcVoro(bool b) { m_calcvoro = b; }
 	void UpdateVoro();
+	const t_graph& GetVoroGraph() const { return m_vorograph; }
 
 private:
 	QWidget *m_parent = nullptr;
@@ -89,6 +92,7 @@ private:
 	std::vector<std::pair<t_vec, t_vec>> m_lines{};
 
 	bool m_calcvoro = true;
+	t_graph m_vorograph{};
 
 	IntersectionCalculationMethod m_intersectioncalculationmethod = IntersectionCalculationMethod::SWEEP;
 

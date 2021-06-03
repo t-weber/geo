@@ -366,9 +366,12 @@ void LinesScene::UpdateVoro()
 	if(!m_calcvoro)
 		return;
 
-	auto [linear_edges, all_parabolic_edges] = g::calc_voro<t_vec>(m_lines);
+	// get vertices and bisectors
+	auto [vertices, linear_edges, all_parabolic_edges, graph]
+		= g::calc_voro<t_vec, std::pair<t_vec, t_vec>, decltype(m_vorograph)>(m_lines);
+	m_vorograph = std::move(graph);
 
-	// linear edges
+	// linear voronoi edges
 	QPen penLinEdge;
 	penLinEdge.setStyle(Qt::SolidLine);
 	penLinEdge.setWidthF(1.);
@@ -383,7 +386,7 @@ void LinesScene::UpdateVoro()
 		m_elems_voro.push_back(item);
 	}
 
-	// parabolic edges
+	// parabolic voronoi edges
 	QPen penParaEdge = penLinEdge;
 
 	for(const auto& parabolic_edges : all_parabolic_edges)
@@ -397,6 +400,24 @@ void LinesScene::UpdateVoro()
 		path.addPolygon(poly);
 
 		QGraphicsItem *item = addPath(path, penParaEdge);
+		m_elems_voro.push_back(item);
+	}
+
+	// voronoi vertices
+	QPen penVertex;
+	penVertex.setStyle(Qt::SolidLine);
+	penVertex.setWidthF(1.);
+	penVertex.setColor(QColor::fromRgbF(0.25, 0., 0.));
+
+	QBrush brushVertex;
+	brushVertex.setStyle(Qt::SolidPattern);
+	brushVertex.setColor(QColor::fromRgbF(0.75, 0., 0.));
+
+	for(const auto& vertex : vertices)
+	{
+		const t_real width = 8.;
+		QRectF rect{vertex[0]-width/2, vertex[1]-width/2, width, width};
+		QGraphicsItem *item = addEllipse(rect, penVertex, brushVertex);
 		m_elems_voro.push_back(item);
 	}
 }
@@ -709,6 +730,22 @@ LinesWnd::LinesWnd(QWidget* pParent) : QMainWindow{pParent},
 		}
 	});
 
+
+	QAction *actionExportGraph = new QAction{"Export Voronoi Graph...", this};
+	connect(actionExportGraph, &QAction::triggered, [this]()
+	{
+		if(QString file = QFileDialog::getSaveFileName(this, "Export DOT", "",
+			"DOT Files (*.dot);;All Files (* *.*)"); file!="")
+		{
+			const auto& graph = m_scene->GetVoroGraph();
+
+			std::ofstream ofstr(file.toStdString());
+			print_graph(graph, ofstr);
+			ofstr << std::endl;
+		}
+	});
+
+
 	QAction *actionQuit = new QAction{"Exit", this};
 	connect(actionQuit, &QAction::triggered, [this]() { this->close(); });
 
@@ -758,6 +795,7 @@ LinesWnd::LinesWnd(QWidget* pParent) : QMainWindow{pParent},
 	menuFile->addAction(actionSaveAs);
 	menuFile->addSeparator();
 	menuFile->addAction(actionExportSvg);
+	menuFile->addAction(actionExportGraph);
 	menuFile->addSeparator();
 	menuFile->addAction(actionQuit);
 
