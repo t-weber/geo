@@ -9,6 +9,13 @@
 #define __GEO_HELPERS__
 
 #include <iterator>
+#include <tuple>
+
+
+template<class T, class t_val = typename std::tuple_element<0, T>::type>
+constexpr bool is_pair =
+	std::is_same_v<T, std::pair<t_val, t_val>> ||
+	std::is_same_v<T, std::tuple<t_val, t_val>>;
 
 
 template<class t_cont>
@@ -20,7 +27,7 @@ class circular_iterator : public std::iterator<
 	typename t_cont::reference>
 {
 public:
-	using t_iter = typename t_cont::iterator;
+	using t_iter = typename t_cont::/*const_*/iterator;
 
 public:
 	circular_iterator(t_cont* cont, t_iter iter, int round=0)

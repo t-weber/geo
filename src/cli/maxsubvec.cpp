@@ -14,6 +14,7 @@
 #include <cstdint>
 
 #include "geo_algos.h"
+#include "helpers.h"
 
 //#define DO_TEST
 

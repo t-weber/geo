@@ -4351,5 +4351,105 @@ create_trapezoid_tree(const std::vector<t_line>& _lines,
 }
 // ----------------------------------------------------------------------------
 
+
+/**
+ * split a concave polygon
+ * @see algorithm: lecture notes by D. Hegazy, 2015
+ */
+template<class t_vec, class t_real = typename t_vec::value_type>
+requires m::is_vec<t_vec>
+std::vector<std::vector<t_vec>> convex_split(
+	const std::vector<t_vec>& poly, t_real eps = 1e-6)
+{
+	const std::size_t N = poly.size();
+
+
+	// find concave corner
+	std::optional<std::size_t> idx_concave, idx_intersection;
+
+	for(std::size_t idx1=0; idx1<N; ++idx1)
+	{
+		std::size_t idx2 = (idx1+1) % N;
+		std::size_t idx3 = (idx1+2) % N;
+
+		const t_vec& vert1 = poly[idx1];
+		const t_vec& vert2 = poly[idx2];
+		const t_vec& vert3 = poly[idx3];
+
+		t_real angle = m::pi<t_real>-line_angle<t_vec>(vert1, vert2, vert2, vert3);
+		angle = m::mod_pos<t_real>(angle, t_real(2)*m::pi<t_real>);
+		//std::cout << "angle: " << angle/m::pi<t_real>*180. << std::endl;
+
+		// corner angle > 180°  =>  concave corner found
+		if(angle > m::pi<t_real>)
+		{
+			idx_concave = idx1;
+			break;
+		}
+	}
+
+
+	// get intersection of concave edge with contour
+	if(idx_concave)
+	{
+		std::size_t idx2 = (*idx_concave+1) % N;
+
+		const t_vec& vert1 = poly[*idx_concave];
+		const t_vec& vert2 = poly[idx2];
+		t_vec dir1 = vert2 - vert1;
+
+		circular_wrapper circularverts(const_cast<std::vector<t_vec>&>(poly));
+
+		auto iterBeg = circularverts.begin() + (*idx_concave + 2);
+		auto iterEnd = circularverts.begin() + (*idx_concave + N);
+
+		for(auto iter=iterBeg; iter!=iterEnd; ++iter)
+		{
+			const t_vec& vert3 = *iter;
+			const t_vec& vert4 = *(iter + 1);
+			t_vec dir2 = vert4 - vert3;
+
+			// intersect infinite line from concave edge with contour line segment
+			auto[pt1, pt2, valid, dist, param1, param2] =
+				m::intersect_line_line(vert1, dir1, vert3, dir2, eps);
+
+			if(valid && param2>=0. && param2<1.)
+			{
+				auto iterInters = (iter+1).GetIter();
+				idx_intersection = iterInters - poly.begin();
+				break;
+			}
+		}
+	}
+
+
+	// split polygon
+	std::vector<std::vector<t_vec>>	split{};
+	split.reserve(2);
+
+	if(idx_concave && idx_intersection)
+	{
+		//std::cout << "split indices: " << *idx_concave << ", " << *idx_intersection << std::endl;
+		circular_wrapper circularverts(const_cast<std::vector<t_vec>&>(poly));
+
+		auto iter1 = circularverts.begin() + (*idx_concave);
+		auto iter2 = circularverts.begin() + (*idx_intersection);
+
+		std::vector<t_vec> poly1, poly2;
+
+		for(auto iter=iter1-1; iter.GetIter()!=(iter2-1).GetIter(); ++iter)
+			poly1.push_back(*iter);;
+		for(auto iter=iter1+1; iter.GetIter()!=(iter2+1).GetIter(); ++iter)
+			poly2.push_back(*iter);;
+
+		split.emplace_back(std::move(poly1));
+		split.emplace_back(std::move(poly2));
+	}
+
+
+	return split;
+}
+
+
 }
 #endif

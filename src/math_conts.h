@@ -1,7 +1,7 @@
 /**
  * containers and operators for use with math algorithms
  * @author Tobias Weber (orcid: 0000-0002-7230-1932)
- * @date jan-18
+ * @date jan-2018 - jun-2021
  * @license: see 'LICENSE' file
  */
 
@@ -107,6 +107,17 @@ requires m::is_basic_vec<t_vec> && m::is_dyn_vec<t_vec>
 
 
 /**
+ * vector * vector
+ */
+template<class t_vec>
+typename t_vec::value_type operator*(const t_vec& vec1, const t_vec& vec2)
+requires m::is_basic_vec<t_vec> && m::is_dyn_vec<t_vec>
+{
+	return inner<t_vec>(vec1, vec2);
+}
+
+
+/**
  * scalar * vector
  */
 template<class t_vec>
@@ -163,7 +174,6 @@ requires m::is_basic_vec<t_vec> && m::is_dyn_vec<t_vec>
 	return vec1;
 }
 
-
 /**
  * vector /= scalar
  */
@@ -174,6 +184,7 @@ requires m::is_basic_vec<t_vec> && m::is_dyn_vec<t_vec>
 	vec1 = vec1 / d;
 	return vec1;
 }
+
 
 
 /**
@@ -474,7 +485,7 @@ requires m::is_basic_mat<t_mat> && m::is_dyn_mat<t_mat>
 		for(t_size col=0; col<mat.size2(); ++col)
 		{
 			auto elem = mat(row, col) * vec[col];
-			vecRet[row] = vecRet[row] + elem;
+			vecRet[row] += elem;
 		}
 	}
 
@@ -485,7 +496,7 @@ requires m::is_basic_mat<t_mat> && m::is_dyn_mat<t_mat>
 }
 
 
-
+// maths
 namespace m {
 
 // ----------------------------------------------------------------------------
@@ -514,6 +525,7 @@ public:
 	friend const vec& operator+(const vec& vec1) { return m_ops::operator+(vec1); }
 	friend vec operator-(const vec& vec1) { return m_ops::operator-(vec1); }
 
+	friend value_type operator*(const vec& vec1, const vec& vec2) { return m_ops::operator*<vec>(vec1, vec2); }
 	friend vec operator*(value_type d, const vec& vec1) { return m_ops::operator*(d, vec1); }
 	friend vec operator*(const vec& vec1, value_type d) { return m_ops::operator*(vec1, d); }
 	friend vec operator/(const vec& vec1, value_type d) { return m_ops::operator/(vec1, d); }
