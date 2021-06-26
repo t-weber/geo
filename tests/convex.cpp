@@ -55,5 +55,33 @@ int main()
 	}
 	std::cout << std::endl;
 
+
+	std::vector<t_vec> poly3
+	{{
+		/*0*/ m::create<t_vec>({0., 0.}),
+		/*1*/ m::create<t_vec>({2., 2.}),
+		/*2*/ m::create<t_vec>({8., 2.}),
+		/*3*/ m::create<t_vec>({10., 0.}),
+		/*4*/ m::create<t_vec>({10., 10.}),
+		/*5*/ m::create<t_vec>({8., 8.}),
+		/*6*/ m::create<t_vec>({2., 8.}),
+		/*7*/ m::create<t_vec>({0., 10.}),
+	}};
+
+	std::cout << "poly3" << std::endl;
+	auto split3 = g::convex_split<t_vec>(poly3);
+	if(split3.size() == 0)
+		std::cout << "already convex" << std::endl;
+
+	for(std::size_t idx=0; idx<split3.size(); ++idx)
+	{
+		const auto& polysplit = split3[idx];
+		std::cout << "split polygon " << idx << std::endl;
+
+		for(const auto& vec : polysplit)
+			std::cout << vec << std::endl;
+	}
+	std::cout << std::endl;
+
 	return 0;
 }

@@ -4437,13 +4437,33 @@ std::vector<std::vector<t_vec>> convex_split(
 
 		std::vector<t_vec> poly1, poly2;
 
-		for(auto iter=iter1-1; iter.GetIter()!=(iter2-1).GetIter(); ++iter)
+		for(auto iter=iter2; iter.GetIter()!=(iter1+2).GetIter(); ++iter)
 			poly1.push_back(*iter);;
 		for(auto iter=iter1+1; iter.GetIter()!=(iter2+1).GetIter(); ++iter)
 			poly2.push_back(*iter);;
 
-		split.emplace_back(std::move(poly1));
-		split.emplace_back(std::move(poly2));
+		// recursively split new polygons
+		if(auto subsplit1 = convex_split<t_vec, t_real>(poly1); subsplit1.size())
+		{
+			for(auto& newpoly : subsplit1)
+				split.emplace_back(std::move(newpoly));
+		}
+		else
+		{
+			// poly1 was already convex
+			split.emplace_back(std::move(poly1));
+		}
+
+		if(auto subsplit2 = convex_split<t_vec, t_real>(poly2); subsplit2.size())
+		{
+			for(auto& newpoly : subsplit2)
+				split.emplace_back(std::move(newpoly));
+		}
+		else
+		{
+			// poly2 was already convex
+			split.emplace_back(std::move(poly2));
+		}
 	}
 
 
