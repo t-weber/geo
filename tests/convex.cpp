@@ -69,13 +69,38 @@ int main()
 	}};
 
 	std::cout << "poly3" << std::endl;
-	auto split3 = g::convex_split<t_vec>(poly3);
+	auto split3 = g::convex_split<t_vec>(poly3, 1e-5);
 	if(split3.size() == 0)
 		std::cout << "already convex" << std::endl;
 
 	for(std::size_t idx=0; idx<split3.size(); ++idx)
 	{
 		const auto& polysplit = split3[idx];
+		std::cout << "split polygon " << idx << std::endl;
+
+		for(const auto& vec : polysplit)
+			std::cout << vec << std::endl;
+	}
+	std::cout << std::endl;
+
+
+	std::vector<t_vec> poly4
+	{{
+		/*0*/ m::create<t_vec>({0., 0.}),
+		/*1*/ m::create<t_vec>({10., 0.}),
+		/*2*/ m::create<t_vec>({10., 10.}),
+		/*3*/ m::create<t_vec>({0., 10.}),
+		/*4*/ m::create<t_vec>({4., 4.}),
+	}};
+
+	std::cout << "poly4" << std::endl;
+	auto split4 = g::convex_split<t_vec>(poly4);
+	if(split4.size() == 0)
+		std::cout << "already convex" << std::endl;
+
+	for(std::size_t idx=0; idx<split4.size(); ++idx)
+	{
+		const auto& polysplit = split4[idx];
 		std::cout << "split polygon " << idx << std::endl;
 
 		for(const auto& vec : polysplit)
