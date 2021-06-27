@@ -3701,7 +3701,7 @@ void fit_trapezoid_lines(std::shared_ptr<TrapezoidNode<t_vec>> node)
 		std::get<0>(lineBottom)[0] = x0;
 		std::get<0>(lineBottom)[1] = bottom_y0;
 		std::get<1>(lineBottom)[0] = x1;
-		std::get<1>(lineBottom)[1] = bottom_y1;;
+		std::get<1>(lineBottom)[1] = bottom_y1;
 		trap->SetBottomLine(lineBottom);
 
 		t_line lineTop = trap->GetTopLine();
@@ -4359,13 +4359,17 @@ create_trapezoid_tree(const std::vector<t_line>& _lines,
 template<class t_vec, class t_real = typename t_vec::value_type>
 requires m::is_vec<t_vec>
 std::vector<std::vector<t_vec>> convex_split(
-	const std::vector<t_vec>& poly, t_real eps = 1e-6)
+	const std::vector<t_vec>& poly, t_real eps = 1e-6,
+	bool always_split_on_intersection = false)
 {
-	bool always_split_on_intersection = false;
 	const std::size_t N = poly.size();
 
 	if(N <= 3)
 		return {};
+
+	for(const t_vec& vert : poly)
+		m_ops::operator<<(std::cout, vert) << std::endl;
+	std::cout << std::endl;
 
 
 	// find concave corner
@@ -4384,8 +4388,12 @@ std::vector<std::vector<t_vec>> convex_split(
 		angle = m::mod_pos<t_real>(angle, t_real(2)*m::pi<t_real>);
 		//std::cout << "angle: " << angle/m::pi<t_real>*180. << std::endl;
 
+		// collinear line, vertex unnecessary
+		if(m::equals(angle, m::pi<t_real>, eps))
+			continue;
+
 		// corner angle > 180°  =>  concave corner found
-		if(angle > m::pi<t_real>)
+		if(angle > m::pi<t_real> /*+ eps*/)
 		{
 			idx_concave = idx1;
 			break;
@@ -4447,7 +4455,7 @@ std::vector<std::vector<t_vec>> convex_split(
 		// sub-polygon 1
 		for(auto iter = iter2; true; ++iter)
 		{
-			poly1.push_back(*iter);;
+			poly1.push_back(*iter);
 			if(iter.GetIter() == (iter1+1).GetIter())
 				break;
 		}
@@ -4475,7 +4483,8 @@ std::vector<std::vector<t_vec>> convex_split(
 		}
 
 		// recursively split new polygons
-		if(auto subsplit1 = convex_split<t_vec, t_real>(poly1); subsplit1.size())
+		if(auto subsplit1 = convex_split<t_vec, t_real>(poly1, eps, always_split_on_intersection);
+			subsplit1.size())
 		{
 			for(auto&& newpoly : subsplit1)
 				split.emplace_back(std::move(newpoly));
@@ -4486,7 +4495,8 @@ std::vector<std::vector<t_vec>> convex_split(
 			split.emplace_back(std::move(poly1));
 		}
 
-		if(auto subsplit2 = convex_split<t_vec, t_real>(poly2); subsplit2.size())
+		if(auto subsplit2 = convex_split<t_vec, t_real>(poly2, eps, always_split_on_intersection);
+			subsplit2.size())
 		{
 			for(auto&& newpoly : subsplit2)
 				split.emplace_back(std::move(newpoly));
