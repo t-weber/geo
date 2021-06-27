@@ -4367,9 +4367,9 @@ std::vector<std::vector<t_vec>> convex_split(
 	if(N <= 3)
 		return {};
 
-	for(const t_vec& vert : poly)
+	/*for(const t_vec& vert : poly)
 		m_ops::operator<<(std::cout, vert) << std::endl;
-	std::cout << std::endl;
+	std::cout << std::endl;*/
 
 
 	// find concave corner
