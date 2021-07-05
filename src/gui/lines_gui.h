@@ -80,6 +80,8 @@ public:
 	const QImage* GetVoroImage() const { return m_elem_voro; }
 
 	void SetCalcVoro(bool b) { m_calcvoro = b; }
+	void SetCalcVoroHelpers(bool b) { m_calcvorohelpers = b; }
+
 	void UpdateVoro();
 	const t_graph& GetVoroGraph() const { return m_vorograph; }
 
@@ -92,6 +94,8 @@ private:
 	std::vector<std::pair<t_vec, t_vec>> m_lines{};
 
 	bool m_calcvoro = true;
+	bool m_calcvorohelpers = false;
+
 	t_graph m_vorograph{};
 
 	IntersectionCalculationMethod m_intersectioncalculationmethod = IntersectionCalculationMethod::SWEEP;

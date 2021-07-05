@@ -367,7 +367,7 @@ void LinesScene::UpdateVoro()
 		return;
 
 	// get vertices and bisectors
-	auto [vertices, linear_edges, all_parabolic_edges, graph]
+	auto [vertices, linear_edges, all_parabolic_edges, linear_helper_edges, graph]
 		= g::calc_voro<t_vec, std::pair<t_vec, t_vec>, decltype(m_vorograph)>(m_lines);
 	m_vorograph = std::move(graph);
 
@@ -384,6 +384,24 @@ void LinesScene::UpdateVoro()
 			QPointF{std::get<1>(linear_edge)[0], std::get<1>(linear_edge)[1]} };
 		QGraphicsItem *item = addLine(line, penLinEdge);
 		m_elems_voro.push_back(item);
+	}
+
+	// linear helper edges
+	if(m_calcvorohelpers)
+	{
+		QPen penLinHelperEdge;
+		penLinHelperEdge.setStyle(Qt::DotLine);
+		penLinHelperEdge.setWidthF(1.);
+		penLinHelperEdge.setColor(QColor::fromRgbF(0.,0.,0.));
+
+		for(const auto& linear_edge : linear_helper_edges)
+		{
+			QLineF line{
+				QPointF{std::get<0>(linear_edge)[0], std::get<0>(linear_edge)[1]},
+				QPointF{std::get<1>(linear_edge)[0], std::get<1>(linear_edge)[1]} };
+				QGraphicsItem *item = addLine(line, penLinHelperEdge);
+				m_elems_voro.push_back(item);
+		}
 	}
 
 	// parabolic voronoi edges
@@ -759,6 +777,15 @@ LinesWnd::LinesWnd(QWidget* pParent) : QMainWindow{pParent},
 		m_scene->UpdateVoro();
 	});
 
+	QAction *actionVoronoiHelpers = new QAction{"Voronoi Helper Lines", this};
+	actionVoronoiHelpers->setCheckable(true);
+	actionVoronoiHelpers->setChecked(false);
+	connect(actionVoronoiHelpers, &QAction::toggled, [this](bool b)
+	{
+		m_scene->SetCalcVoroHelpers(b);
+		m_scene->UpdateVoro();
+	});
+
 	QAction *actionVoronoiRegionsPixel = new QAction{"Voronoi Regions (Pixel-Wise)", this};
 	connect(actionVoronoiRegionsPixel, &QAction::triggered, [this]()
 	{
@@ -800,6 +827,7 @@ LinesWnd::LinesWnd(QWidget* pParent) : QMainWindow{pParent},
 	menuFile->addAction(actionQuit);
 
 	menuCalc->addAction(actionVoronoiRegions);
+	menuCalc->addAction(actionVoronoiHelpers);
 	menuCalc->addSeparator();
 	menuCalc->addAction(actionVoronoiRegionsPixel);
 

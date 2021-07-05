@@ -1178,8 +1178,16 @@ requires m::is_vec<t_vec>
  * @see https://github.com/boostorg/polygon/blob/develop/example/voronoi_visualizer.cpp
  * @see https://www.boost.org/doc/libs/1_75_0/libs/polygon/doc/voronoi_diagram.htm
  */
-template<class t_vec, class t_line=std::pair<t_vec, t_vec>, class t_graph=adjacency_matrix<typename t_vec::value_type>>
-std::tuple<std::vector<t_vec>, std::vector<t_line>, std::vector<std::vector<t_vec>>, t_graph>
+template<
+	class t_vec,
+	class t_line = std::pair<t_vec, t_vec>,
+	class t_graph = adjacency_matrix<typename t_vec::value_type>>
+std::tuple<
+	std::vector<t_vec>,
+	std::vector<t_line>,
+	std::vector<std::vector<t_vec>>,
+	std::vector<t_line>,
+	t_graph>
 calc_voro(const std::vector<t_line>& lines)
 requires m::is_vec<t_vec> && is_graph<t_graph>
 {
@@ -1235,26 +1243,28 @@ requires m::is_vec<t_vec> && is_graph<t_graph>
 
 	// edges
 	std::vector<std::vector<t_vec>> all_parabolic_edges;
-	std::vector<t_line> linear_edges;
+	std::vector<t_line> linear_edges, linear_helper_edges;
 	linear_edges.reserve(voro.edges().size());
+	linear_helper_edges.reserve(voro.edges().size());
 
 	for(const auto& edge : voro.edges())
 	{
 		// only bisectors, no internal edges
-		if(edge.is_secondary())
-			continue;
+		bool is_helper_edge = edge.is_secondary();
 
-		// add graph edges
-		const auto* vert0 = edge.vertex0();
-		const auto* vert1 = edge.vertex1();
-		auto vert0idx = get_vertex_idx(vert0);
-		auto vert1idx = get_vertex_idx(vert1);
-		if(vert0idx && vert1idx)
+		if(!is_helper_edge)
 		{
-			// TODO: arc length of parabolic edges
-			t_real len = m::norm(vertices[*vert1idx] - vertices[*vert0idx]);
-			graph.AddEdge(*vert0idx, *vert1idx, len);
-			graph.AddEdge(*vert1idx, *vert0idx, len);
+			// add graph edges
+			auto vert0idx = get_vertex_idx(edge.vertex0());
+			auto vert1idx = get_vertex_idx(edge.vertex1());
+
+			if(vert0idx && vert1idx)
+			{
+				// TODO: arc length of parabolic edges
+				t_real len = m::norm(vertices[*vert1idx] - vertices[*vert0idx]);
+				graph.AddEdge(*vert0idx, *vert1idx, len);
+				graph.AddEdge(*vert1idx, *vert0idx, len);
+			}
 		}
 
 		// get line segment
@@ -1330,6 +1340,10 @@ requires m::is_vec<t_vec> && is_graph<t_graph>
 		// parabolic edge
 		if(edge.is_curved())
 		{
+			// shouldn't get there as there's no parabolic helper lines
+			if(is_helper_edge)
+				continue;
+
 			const t_line* seg = get_segment(edge.cell()->contains_point());
 			const t_vec* pt = get_segment_point(!edge.cell()->contains_point());
 			if(!seg || !pt)
@@ -1355,8 +1369,14 @@ requires m::is_vec<t_vec> && is_graph<t_graph>
 			// finite edge
 			if(edge.is_finite())
 			{
-				linear_edges.push_back(std::make_pair(
-					vertex_to_vec(*edge.vertex0()), vertex_to_vec(*edge.vertex1())));
+				auto edgeline = std::make_pair(
+					vertex_to_vec(*edge.vertex0()),
+					vertex_to_vec(*edge.vertex1()));
+
+				if(is_helper_edge)
+					linear_helper_edges.emplace_back(std::move(edgeline));
+				else
+					linear_edges.emplace_back(std::move(edgeline));
 			}
 
 			// infinite edge
@@ -1381,31 +1401,50 @@ requires m::is_vec<t_vec> && is_graph<t_graph>
 
 				const t_vec* vec = get_segment_point(false);
 				const t_vec* twinvec = get_segment_point(true);
+				//std::cout << is_helper_edge << " " << vec << " " << twinvec << std::endl;
 
-				if(!vec || !twinvec)
-					continue;
+				if(is_helper_edge)
+				{
+					if(!vec && !twinvec)
+						continue;
+					if(!vec && twinvec)
+						vec = twinvec;
 
-				t_vec perpdir = *vec - *twinvec;
-				if(inverted)
-					perpdir = -perpdir;
-				t_vec linedir = m::create<t_vec>({ perpdir[1], -perpdir[0] });
+					t_vec perpdir = *vec - lineorg;
+					perpdir /= m::norm(perpdir);
+					perpdir *= infline_len;
 
-				linedir /= m::norm(linedir);
-				linedir *= infline_len;
+					auto edgeline = std::make_pair(lineorg, lineorg + perpdir);
+					linear_helper_edges.emplace_back(std::move(edgeline));
+				}
+				else
+				{
+					if(!vec || !twinvec)
+						continue;
 
-				linear_edges.push_back(std::make_pair(lineorg, lineorg + linedir));
+					t_vec perpdir = *vec - *twinvec;
+					if(inverted)
+						perpdir = -perpdir;
+					t_vec linedir = m::create<t_vec>({ perpdir[1], -perpdir[0] });
+
+					linedir /= m::norm(linedir);
+					linedir *= infline_len;
+
+					auto edgeline = std::make_pair(lineorg, lineorg + linedir);
+					linear_edges.emplace_back(std::move(edgeline));
+				}
 			}
 		}
 	}
 
-	return std::make_tuple(vertices, linear_edges, all_parabolic_edges, graph);
+	return std::make_tuple(vertices, linear_edges, all_parabolic_edges, linear_helper_edges, graph);
 
 #else
 
 	// disable function
 	return std::make_tuple(std::vector<t_vec>{},
 		std::vector<t_line>{}, std::vector<std::vector<t_vec>>{},
-		t_graph{});
+		std::vector<t_line>{}, t_graph{});
 
 #endif
 }
