@@ -367,11 +367,11 @@ void LinesScene::UpdateVoro()
 		return;
 
 	// get vertices and bisectors
-	auto [vertices, linear_edges, all_parabolic_edges, linear_helper_edges, graph]
+	auto [vertices, linear_edges, linear_inf_edges, all_parabolic_edges, linear_helper_edges, graph]
 		= g::calc_voro<t_vec, std::pair<t_vec, t_vec>, decltype(m_vorograph)>(m_lines);
 	m_vorograph = std::move(graph);
 
-	// linear voronoi edges
+	// linear finite voronoi edges
 	QPen penLinEdge;
 	penLinEdge.setStyle(Qt::SolidLine);
 	penLinEdge.setWidthF(1.);
@@ -386,13 +386,28 @@ void LinesScene::UpdateVoro()
 		m_elems_voro.push_back(item);
 	}
 
+	// linear infinite voronoi edges
+	QPen penLinEdgeInf;
+	penLinEdgeInf.setStyle(Qt::DashLine);
+	penLinEdgeInf.setWidthF(1.);
+	penLinEdgeInf.setColor(QColor::fromRgbF(0.,0.,0.));
+
+	for(const auto& linear_edge : linear_inf_edges)
+	{
+		QLineF line{
+			QPointF{std::get<0>(linear_edge)[0], std::get<0>(linear_edge)[1]},
+			QPointF{std::get<1>(linear_edge)[0], std::get<1>(linear_edge)[1]} };
+			QGraphicsItem *item = addLine(line, penLinEdgeInf);
+			m_elems_voro.push_back(item);
+	}
+
 	// linear helper edges
 	if(m_calcvorohelpers)
 	{
 		QPen penLinHelperEdge;
 		penLinHelperEdge.setStyle(Qt::DotLine);
 		penLinHelperEdge.setWidthF(1.);
-		penLinHelperEdge.setColor(QColor::fromRgbF(0.,0.,0.));
+		penLinHelperEdge.setColor(QColor::fromRgbF(1., 0., 0.));
 
 		for(const auto& linear_edge : linear_helper_edges)
 		{

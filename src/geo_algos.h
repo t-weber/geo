@@ -1183,10 +1183,11 @@ template<
 	class t_line = std::pair<t_vec, t_vec>,
 	class t_graph = adjacency_matrix<typename t_vec::value_type>>
 std::tuple<
-	std::vector<t_vec>,
-	std::vector<t_line>,
-	std::vector<std::vector<t_vec>>,
-	std::vector<t_line>,
+	std::vector<t_vec>,		// vertices
+	std::vector<t_line>,	// linear finite edge
+	std::vector<t_line>,	// linear infinite edge
+	std::vector<std::vector<t_vec>>,	// quadratic edge
+	std::vector<t_line>,	// helper lines
 	t_graph>
 calc_voro(const std::vector<t_line>& lines)
 requires m::is_vec<t_vec> && is_graph<t_graph>
@@ -1243,8 +1244,9 @@ requires m::is_vec<t_vec> && is_graph<t_graph>
 
 	// edges
 	std::vector<std::vector<t_vec>> all_parabolic_edges;
-	std::vector<t_line> linear_edges, linear_helper_edges;
+	std::vector<t_line> linear_edges, linear_inf_edges, linear_helper_edges;
 	linear_edges.reserve(voro.edges().size());
+	linear_inf_edges.reserve(voro.edges().size());
 	linear_helper_edges.reserve(voro.edges().size());
 
 	for(const auto& edge : voro.edges())
@@ -1431,19 +1433,21 @@ requires m::is_vec<t_vec> && is_graph<t_graph>
 					linedir *= infline_len;
 
 					auto edgeline = std::make_pair(lineorg, lineorg + linedir);
-					linear_edges.emplace_back(std::move(edgeline));
+					linear_inf_edges.emplace_back(std::move(edgeline));
 				}
 			}
 		}
 	}
 
-	return std::make_tuple(vertices, linear_edges, all_parabolic_edges, linear_helper_edges, graph);
+	return std::make_tuple(vertices, linear_edges, linear_inf_edges,
+		all_parabolic_edges, linear_helper_edges, graph);
 
 #else
 
 	// disable function
 	return std::make_tuple(std::vector<t_vec>{},
-		std::vector<t_line>{}, std::vector<std::vector<t_vec>>{},
+		std::vector<t_line>{}, std::vector<t_line>{},
+		std::vector<std::vector<t_vec>>{},
 		std::vector<t_line>{}, t_graph{});
 
 #endif

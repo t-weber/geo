@@ -118,6 +118,13 @@ void HullScene::SetCalculateVoronoiVertices(bool b)
 }
 
 
+void HullScene::SetCalculateVoronoiCircles(bool b)
+{
+	m_calcvoronoicircles = b;
+	UpdateDelaunay();
+}
+
+
 void HullScene::SetCalculateVoronoiRegions(bool b)
 {
 	m_calcvoronoiregions = b;
@@ -222,16 +229,18 @@ void HullScene::UpdateHull()
 	}
 
 
-	#ifdef HULL_CHECK
+#ifdef HULL_CHECK
 	std::vector<t_vec> hullvertices;
 	for(const auto& thetriag : hull)
 		for(std::size_t idx1=0; idx1<thetriag.size(); ++idx1)
 			hullvertices.emplace_back(thetriag[idx1]);
-		#endif
+#endif
 
-		// convex hull
-		QPen penHull;
-	penHull.setWidthF(2.);
+	// convex hull
+	QPen penHull;
+	penHull.setWidthF(3.);
+	penHull.setStyle(Qt::SolidLine);
+	penHull.setColor(QColor::fromRgbF(0.,0.,1.));
 
 	for(const auto& thetriag : hull)
 	{
@@ -276,7 +285,7 @@ void HullScene::UpdateDelaunay()
 
 
 	if((!m_calcdelaunay && !m_calckruskal
-		&& !m_calcvoronoivertices && !m_calcvoronoiregions)
+		&& !m_calcvoronoivertices && !m_calcvoronoicircles && !m_calcvoronoiregions)
 		|| m_vertices.size() < 4)
 		return;
 
@@ -311,11 +320,12 @@ void HullScene::UpdateDelaunay()
 
 	const t_real itemRad = 7.;
 
-	if(m_calcvoronoivertices)
+	if(m_calcvoronoivertices || m_calcvoronoicircles)
 	{
 		QPen penVoronoi;
 		penVoronoi.setStyle(Qt::SolidLine);
 		penVoronoi.setWidthF(1.);
+		penVoronoi.setColor(QColor::fromRgbF(1.,0.,0.));
 
 		QPen penCircle;
 		penCircle.setStyle(Qt::DotLine);
@@ -326,18 +336,21 @@ void HullScene::UpdateDelaunay()
 		brushVoronoi.setStyle(Qt::SolidPattern);
 		brushVoronoi.setColor(QColor::fromRgbF(1.,0.,0.));
 
-		// voronoi vertices
 		for(std::size_t idx=0; idx<voronoi.size(); ++idx)
 		{
 			const t_vec& voronoivert = voronoi[idx];
-
 			QPointF voronoipt{voronoivert[0], voronoivert[1]};
-			QGraphicsItem *voronoiItem = addEllipse(
-				voronoipt.x()-itemRad/2., voronoipt.y()-itemRad/2., itemRad, itemRad, penVoronoi, brushVoronoi);
-			m_voronoi.insert(voronoiItem);
+
+			// voronoi vertices
+			if(m_calcvoronoivertices)
+			{
+				QGraphicsItem *voronoiItem = addEllipse(
+					voronoipt.x()-itemRad/2., voronoipt.y()-itemRad/2., itemRad, itemRad, penVoronoi, brushVoronoi);
+				m_voronoi.insert(voronoiItem);
+			}
 
 			// circles
-			if(idx < triags.size())
+			if(m_calcvoronoicircles && idx < triags.size())
 			{
 				const auto& triag = triags[idx];
 				if(triag.size() >= 3)
@@ -358,12 +371,12 @@ void HullScene::UpdateDelaunay()
 		QPen penVoronoi;
 		penVoronoi.setStyle(Qt::SolidLine);
 		penVoronoi.setWidthF(1.);
-		penVoronoi.setColor(QColor::fromRgbF(1.,0.,0.));
+		penVoronoi.setColor(QColor::fromRgbF(0.,0.,0.));
 
 		QPen penVoronoiUnbound;
 		penVoronoiUnbound.setStyle(Qt::DashLine);
 		penVoronoiUnbound.setWidthF(1.);
-		penVoronoiUnbound.setColor(QColor::fromRgbF(1.,0.,0.));
+		penVoronoiUnbound.setColor(QColor::fromRgbF(0.,0.,0.));
 
 		for(std::size_t idx=0; idx<voronoi.size(); ++idx)
 		{
@@ -432,7 +445,7 @@ void HullScene::UpdateDelaunay()
 		QPen penDelaunay;
 		penDelaunay.setStyle(Qt::SolidLine);
 		penDelaunay.setWidthF(1.);
-		penDelaunay.setColor(QColor::fromRgbF(0.,0.,0.));
+		penDelaunay.setColor(QColor::fromRgbF(0.,0.,1.));
 
 		// delaunay triangles
 		for(const auto& thetriag : triags)
@@ -661,6 +674,8 @@ HullWnd::HullWnd(QWidget* pParent) : QMainWindow{pParent},
 		settings.value("calc_hull", m_scene->GetCalculateHull()).toBool());
 	m_scene->SetCalculateVoronoiVertices(
 		settings.value("calc_voronoivertices", m_scene->GetCalculateVoronoiVertices()).toBool());
+	m_scene->SetCalculateVoronoiCircles(
+		settings.value("calc_voronoicircles", m_scene->GetCalculateVoronoiCircles()).toBool());
 	m_scene->SetCalculateVoronoiRegions(
 		settings.value("calc_voronoiregions", m_scene->GetCalculateVoronoiRegions()).toBool());
 	m_scene->SetCalculateDelaunay(
@@ -797,6 +812,12 @@ HullWnd::HullWnd(QWidget* pParent) : QMainWindow{pParent},
 	connect(actionVoronoi, &QAction::toggled, [this](bool b)
 		{ m_scene->SetCalculateVoronoiVertices(b); });
 
+	QAction *actionVoronoiCircles = new QAction{"Voronoi Circles", this};
+	actionVoronoiCircles->setCheckable(true);
+	actionVoronoiCircles->setChecked(m_scene->GetCalculateVoronoiCircles());
+	connect(actionVoronoiCircles, &QAction::toggled, [this](bool b)
+		{ m_scene->SetCalculateVoronoiCircles(b); });
+
 	QAction *actionVoronoiRegions = new QAction{"Voronoi Regions", this};
 	actionVoronoiRegions->setCheckable(true);
 	actionVoronoiRegions->setChecked(m_scene->GetCalculateVoronoiRegions());
@@ -900,6 +921,7 @@ HullWnd::HullWnd(QWidget* pParent) : QMainWindow{pParent},
 	menuCalc->addAction(actionHull);
 	menuCalc->addSeparator();
 	menuCalc->addAction(actionVoronoi);
+	menuCalc->addAction(actionVoronoiCircles);
 	menuCalc->addAction(actionVoronoiRegions);
 	menuCalc->addSeparator();
 	menuCalc->addAction(actionDelaunay);
@@ -963,6 +985,7 @@ void HullWnd::closeEvent(QCloseEvent *e)
 	settings.setValue("wnd_state", state);
 	settings.setValue("calc_hull", m_scene->GetCalculateHull());
 	settings.setValue("calc_voronoivertices", m_scene->GetCalculateVoronoiVertices());
+	settings.setValue("calc_voronoicircles", m_scene->GetCalculateVoronoiCircles());
 	settings.setValue("calc_voronoiregions", m_scene->GetCalculateVoronoiRegions());
 	settings.setValue("calc_delaunay", m_scene->GetCalculateDelaunay());
 	settings.setValue("calc_kruskal", m_scene->GetCalculateKruskal());

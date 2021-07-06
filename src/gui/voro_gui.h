@@ -71,12 +71,14 @@ public:
 public:
 	void SetCalculateHull(bool b);
 	void SetCalculateVoronoiVertices(bool b);
+	void SetCalculateVoronoiCircles(bool b);
 	void SetCalculateVoronoiRegions(bool b);
 	void SetCalculateDelaunay(bool b);
 	void SetCalculateKruskal(bool b);
 
 	bool GetCalculateHull() const { return m_calchull; }
 	bool GetCalculateVoronoiVertices() const { return m_calcvoronoivertices; }
+	bool GetCalculateVoronoiCircles() const { return m_calcvoronoicircles; }
 	bool GetCalculateVoronoiRegions() const { return m_calcvoronoiregions; }
 	bool GetCalculateDelaunay() const { return m_calcdelaunay; }
 	bool GetCalculateKruskal() const { return m_calckruskal; }
@@ -103,7 +105,8 @@ private:
 	std::unordered_set<QGraphicsItem*> m_delaunay{};
 
 	bool m_calchull = true;
-	bool m_calcvoronoivertices = false;
+	bool m_calcvoronoivertices = true;
+	bool m_calcvoronoicircles = false;
 	bool m_calcvoronoiregions = true;
 	bool m_calcdelaunay = true;
 	bool m_calckruskal = false;
