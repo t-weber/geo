@@ -58,10 +58,17 @@ public:
 
 	void UpdateAll();
 	void UpdateEdges();
+	void UpdateSplitPolygon();
 	void UpdateKer();
 
 	void SetSortVertices(bool b);
 	bool GetSortVertices() const { return m_sortvertices; }
+
+	void SetCalcSplitPolygon(bool b);
+	bool GetCalcSplitPolygon() const { return m_splitpolygon; }
+
+	void SetCalcKernel(bool b);
+	bool GetCalcKernel() const { return m_calckernel; }
 
 protected:
 	virtual void mousePressEvent(QMouseEvent *evt) override;
@@ -74,13 +81,15 @@ private:
 	QGraphicsScene *m_scene = nullptr;
 
 	std::vector<Vertex*> m_elems_vertices{};
-	std::vector<QGraphicsItem*> m_elems_edges{}, m_elems_ker{};
+	std::vector<QGraphicsItem*> m_elems_edges{}, m_elems_ker{}, m_elems_split{};
 
 	bool m_dragging = false;
 
 	std::vector<t_vec> m_vertices{};
 
 	bool m_sortvertices = true;
+	bool m_splitpolygon = true;
+	bool m_calckernel = true;
 
 signals:
 	void SignalMouseCoordinates(double x, double y);

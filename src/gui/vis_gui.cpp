@@ -232,6 +232,9 @@ void VisView::ClearVertices()
 }
 
 
+/**
+ * calculate everything
+ */
 void VisView::UpdateAll()
 {
 	// get vertices
@@ -244,10 +247,14 @@ void VisView::UpdateAll()
 		std::tie(m_vertices, std::ignore) = g::sort_vertices_by_angle<t_vec>(m_vertices);
 
 	UpdateEdges();
+	UpdateSplitPolygon();
 	UpdateKer();
 }
 
 
+/**
+ * draw the polygon edges
+ */
 void VisView::UpdateEdges()
 {
 	// remove previous edges
@@ -279,6 +286,62 @@ void VisView::UpdateEdges()
 }
 
 
+/**
+ * split the polygon into convex regions
+ */
+void VisView::UpdateSplitPolygon()
+{
+	try
+	{
+		// remove previous split poly
+		for(QGraphicsItem* item : m_elems_split)
+		{
+			m_scene->removeItem(item);
+			delete item;
+		}
+		m_elems_split.clear();
+
+		if(!m_splitpolygon)
+			return;
+
+		auto splitpolys = g::convex_split<t_vec>(m_vertices, g_eps, true);
+
+		// already convex?
+		if(splitpolys.size() == 0)
+			return;
+
+		QPen penKer;
+		penKer.setStyle(Qt::SolidLine);
+		penKer.setWidthF(2.);
+		penKer.setColor(QColor::fromRgbF(0., 0., 1., 1.));
+
+		QBrush brushKer;
+		brushKer.setColor(QColor::fromRgbF(0., 0., 1., 0.1));
+		brushKer.setStyle(Qt::SolidPattern);
+
+		for(const auto& splitpoly : splitpolys)
+		{
+			QPolygonF poly;
+			for(std::size_t vertidx = 0; vertidx < splitpoly.size(); ++vertidx)
+			{
+				const t_vec& vertex1 = splitpoly[vertidx];
+				poly << QPointF(vertex1[0], vertex1[1]);
+			}
+
+			QGraphicsItem *item = m_scene->addPolygon(poly, penKer, brushKer);
+			m_elems_split.push_back(item);
+		}
+	}
+	catch(const std::exception& ex)
+	{
+		std::cerr << ex.what() << std::endl;
+	}
+}
+
+
+/**
+ * calculate the kernel of the polygon
+ */
 void VisView::UpdateKer()
 {
 	// remove previous vis poly
@@ -289,6 +352,8 @@ void VisView::UpdateKer()
 	}
 	m_elems_ker.clear();
 
+	if(!m_calckernel)
+		return;
 
 	std::vector<t_vec> verts_reversed;
 	verts_reversed.reserve(m_vertices.size());
@@ -334,6 +399,20 @@ void VisView::UpdateKer()
 void VisView::SetSortVertices(bool b)
 {
 	m_sortvertices = b;
+	UpdateAll();
+}
+
+
+void VisView::SetCalcSplitPolygon(bool b)
+{
+	m_splitpolygon = b;
+	UpdateAll();
+}
+
+
+void VisView::SetCalcKernel(bool b)
+{
+	m_calckernel = b;
 	UpdateAll();
 }
 
@@ -493,6 +572,15 @@ VisWnd::VisWnd(QWidget* pParent) : QMainWindow{pParent},
 	actionSort->setChecked(m_view->GetSortVertices());
 	connect(actionSort, &QAction::toggled, [this](bool b) { m_view->SetSortVertices(b); });
 
+	QAction *actionSplit = new QAction{"Split Polygon", this};
+	actionSplit->setCheckable(true);
+	actionSplit->setChecked(m_view->GetCalcSplitPolygon());
+	connect(actionSplit, &QAction::toggled, [this](bool b) { m_view->SetCalcSplitPolygon(b); });
+
+	QAction *actionKer = new QAction{"Kernel", this};
+	actionKer->setCheckable(true);
+	actionKer->setChecked(m_view->GetCalcKernel());
+	connect(actionKer, &QAction::toggled, [this](bool b) { m_view->SetCalcKernel(b); });
 
 	// menu
 	QMenu *menuFile = new QMenu{"File", this};
@@ -508,6 +596,9 @@ VisWnd::VisWnd(QWidget* pParent) : QMainWindow{pParent},
 	menuFile->addAction(actionQuit);
 
 	menuCalc->addAction(actionSort);
+	menuCalc->addSeparator();
+	menuCalc->addAction(actionSplit);
+	menuCalc->addAction(actionKer);
 
 
 	// menu bar
