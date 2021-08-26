@@ -25,7 +25,11 @@ int main()
 	t_vec pt2b = m::create<t_vec>({g::get_rand(min,max), g::get_rand(min, max)});
 
 	auto [ok, inters] = g::intersect_lines<t_vec>(pt1a, pt1b, pt2a, pt2b, true, 1e-4);
-	std::cout << "intersection: " << std::boolalpha << ok << ", at " << inters << "." << std::endl;
+	bool inters_check = g::intersect_lines_check<t_vec>(pt1a, pt1b, pt2a, pt2b);
+
+	std::cout << "intersection: "
+		<< std::boolalpha << ok << ", " << inters_check
+		<< ", at " << inters << "." << std::endl;
 
 	return 0;
 }

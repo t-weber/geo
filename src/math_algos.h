@@ -4,13 +4,15 @@
  * @date dec-2017 - jun-2021
  * @license see 'LICENSE' file
  *
- * @see general references for algorithms:
+ * @see references for algorithms:
  * 	- (Arens15): T. Arens et al., ISBN: 978-3-642-44919-2, DOI: 10.1007/978-3-642-44919-2 (2015).
  * 	- (Arfken13): G. B. Arfken et al., ISBN: 978-0-12-384654-9, DOI: 10.1016/C2009-0-30629-7 (2013).
- * 	- (Bronstein08): I. N. Bronstein et al., ISBN: 978-3-8171-2017-8 (2008).
+ *	- (DesktopBronstein08): I. N. Bronstein et al., ISBN: 978-3-8171-2017-8 (2008) [in its HTML version "Desktop Bronstein"].
+ * 	- (Bronstein08): I. N. Bronstein et al., ISBN: 978-3-8171-2017-8 (2008) [in its paperback version].
  * 	- (Merziger06): G. Merziger and T. Wirth, ISBN: 3923923333 (2006).
  * 	- (Scarpino11): M. Scarpino, ISBN: 978-1-6172-9017-6 (2011).
  * 	- (Shirane02): G. Shirane et al., ISBN: 978-0-5214-1126-4 (2002).
+ * 	- (Kuipers02): J. B. Kuipers, ISBN: 0-691-05872-5 (2002).
  * 	- (FUH 2021): "Effiziente Algorithmen" (2021), Kurs 1684, Fernuni Hagen (https://vu.fernuni-hagen.de/lvuweb/lvu/app/Kurs/01684).
  */
 
@@ -189,6 +191,31 @@ requires is_mat<t_mat>
 			}
 		}
 	}
+
+	return true;
+}
+
+
+/**
+ * are two quaternions equal within an epsilon range?
+ * @see (Kuipers02), p. 105
+ */
+template<class t_quat>
+bool equals(const t_quat& quat1, const t_quat& quat2,
+	typename t_quat::value_type eps = std::numeric_limits<typename t_quat::value_type>::epsilon())
+requires is_basic_quat<t_quat>
+{
+	using T = typename t_quat::value_type;
+
+	// check each element
+	if(!equals<T>(quat1.real(), quat2.real(), eps))
+		return false;
+	if(!equals<T>(quat1.imag1(), quat2.imag1(), eps))
+		return false;
+	if(!equals<T>(quat1.imag2(), quat2.imag2(), eps))
+		return false;
+	if(!equals<T>(quat1.imag3(), quat2.imag3(), eps))
+		return false;
 
 	return true;
 }
@@ -417,6 +444,18 @@ requires is_basic_vec<t_vec>
 
 
 /**
+ * zero quaternion
+ */
+template<class t_quat>
+const t_quat& zero()
+requires is_basic_quat<t_quat>
+{
+	static const t_quat quat(0, 0, 0, 0);
+	return quat;
+}
+
+
+/**
  * tests for zero vector
  */
 template<class t_vec>
@@ -437,6 +476,18 @@ bool equals_0(const t_mat& mat,
 requires is_mat<t_mat>
 {
 	return equals<t_mat>(mat, zero<t_mat>(mat.size1(), mat.size2()), eps);
+}
+
+
+/**
+ * tests for zero quaternion
+ */
+template<class t_quat>
+bool equals_0(const t_quat& quat,
+	typename t_quat::value_type eps = std::numeric_limits<typename t_quat::value_type>::epsilon())
+requires is_basic_quat<t_quat>
+{
+	return equals<t_quat>(quat, zero<t_quat>(), eps);
 }
 
 
@@ -848,8 +899,9 @@ requires is_mat<t_mat>
  * matrix-vector product using only a portion of the matrix
  */
 template<class t_mat, class t_vec>
-t_vec mult(const t_mat& mat, const t_vec& vec, std::size_t outsize,
-	std::size_t row_begin=0, std::size_t col_begin=0)
+t_vec mult(const t_mat& mat, const t_vec& vec,
+	std::size_t outsize = std::numeric_limits<std::size_t>::max(),
+	std::size_t row_begin = 0, std::size_t col_begin = 0)
 requires m::is_basic_mat<t_mat> && m::is_dyn_mat<t_mat>
 && m::is_basic_vec<t_vec> && m::is_dyn_vec<t_vec>
 {
@@ -873,6 +925,7 @@ requires m::is_basic_mat<t_mat> && m::is_dyn_mat<t_mat>
 
 // ----------------------------------------------------------------------------
 // with metric
+// ----------------------------------------------------------------------------
 
 /**
  * covariant metric tensor, g_{i,j} = e_i * e_j
@@ -1258,7 +1311,7 @@ requires is_vec<t_vec>
 
 /**
  * find orthonormal substitute basis for vector space (Gram-Schmidt algo)
- * remove orthogonal projections to all other base vectors: |i'> = (1 - sum_{j<i} |j><j|) |i>
+ * remove orthogonal projections to all other basis vectors: |i'> = (1 - sum_{j<i} |j><j|) |i>
  * @see (Arens15), p. 744
  * @see https://en.wikipedia.org/wiki/Gram%E2%80%93Schmidt_process
  */
@@ -1291,7 +1344,7 @@ requires is_vec<t_vec>
 
 /**
  * find orthonormal substitute basis for vector space (Gram-Schmidt algo)
- * remove orthogonal projections to all other base vectors: |i'> = (1 - sum_{j<i} |j><j|) |i>
+ * remove orthogonal projections to all other basis vectors: |i'> = (1 - sum_{j<i} |j><j|) |i>
  * @see (Arens15), p. 744
  * @see https://en.wikipedia.org/wiki/Gram%E2%80%93Schmidt_process
  */
@@ -3259,6 +3312,7 @@ requires is_vec<t_vec> && is_mat<t_mat>
  * set bZ01=false for gl (near and far planes at -1 and +1), and bZ01=true for vk (planes at 0 and 1)
  * @see https://www.khronos.org/registry/OpenGL-Refpages/gl2.1/xhtml/gluPerspective.xml
  * @see https://github.com/PacktPublishing/Vulkan-Cookbook/blob/master/Library/Source%20Files/10%20Helper%20Recipes/04%20Preparing%20a%20perspective%20projection%20matrix.cpp
+ * @see (Kuipers02), pp. 350-351 for a simplified version of the perspective trafo
  */
 template<class t_mat>
 t_mat hom_perspective(
@@ -3281,10 +3335,31 @@ requires is_mat<t_mat>
 	// P * x = ( z*(n0+f)/(n-f) + w*sc*n*f/(n-f) )  =>  ( -(n0+f)/(n-f) - w/z*sc*n*f/(n-f) )
 	//         ( -z                              )      ( 1                                )
 	return create<t_mat>({
-		c*ratio,    0.,     0.,                 0.,
-		0,          ys*c,   0.,                 0.,
-		0.,         0.,     zs*(n0+f)/(n-f),    sc*n*f/(n-f),
-		0.,         0.,     -zs,                0.
+		c*ratio,    0.,     0.,                         0. /* t_x = 0, because it's already centred */,
+		0.,         ys*c,   0.,                         0. /* t_y = 0, because it's already centred */,
+		0.,         0.,     zs*(n0+f)/(n-f),            sc*n*f/(n-f),
+		0.,         0.,     -zs /* persp. division */,  0.
+	});
+}
+
+
+/**
+ * simple perspective projection matrix (homogeneous 4x4), without normalising the ranges
+ * @see (Kuipers02), pp. 350-351 for a simplified version of the perspective trafo
+ */
+template<class t_mat>
+t_mat hom_perspective_no_normalisation(typename t_mat::value_type n = 0.01)
+requires is_mat<t_mat>
+{
+	//         ( nx )    ( nx/z )
+	//         ( ny )    ( ny/z )
+	// P * x = ( nz ) => (  n   )
+	//         (  z )    (  1   )
+	return create<t_mat>({
+		n,  0,  0,  0,
+		0,  n,  0,  0,
+		0,  0,  n,  0,
+		0,  0,  1,  0
 	});
 }
 
@@ -3317,6 +3392,37 @@ requires is_mat<t_mat>
 	return create<t_mat>({
 		T(2)/w,   0.,         0.,       -(r+l)/w,
 		0,        T(2)*ys/h,  0.,       -ys*(t+b)/h,
+		0.,       0.,         sc*zs/d,   zs*(n+f0)/d,
+		0.,       0.,         0.,        1.
+	});
+}
+
+
+/**
+ * parallel projection matrix (homogeneous 4x4)
+ * set bZ01=false for gl (near and far planes at -1 and +1), and bZ01=true for vk (planes at 0 and 1)
+ * @see https://www.khronos.org/registry/OpenGL-Refpages/gl2.1/xhtml/glOrtho.xml
+ * @see https://github.com/PacktPublishing/Vulkan-Cookbook/blob/master/Library/Source%20Files/10%20Helper%20Recipes/05%20Preparing%20an%20orthographic%20projection%20matrix.cpp
+ */
+template<class t_mat>
+t_mat hom_parallel_sym(
+	typename t_mat::value_type n = 0.01, typename t_mat::value_type f = 100.,
+	typename t_mat::value_type w = 4, typename t_mat::value_type h = 4.,
+	bool bInvZ = false, bool bZ01 = false, bool bInvY = false)
+requires is_mat<t_mat>
+{
+	using T = typename t_mat::value_type;
+
+	const T d = n - f;
+
+	const T sc = bZ01 ? T(1) : T(2);
+	const T f0 = bZ01 ? T(0) : f;
+	const T ys = bInvY ? T(-1) : T(1);
+	const T zs = bInvZ ? T(-1) : T(1);
+
+	return create<t_mat>({
+		T(2)/w,   0.,         0.,        0.,
+		0,        T(2)*ys/h,  0.,        0.,
 		0.,       0.,         sc*zs/d,   zs*(n+f0)/d,
 		0.,       0.,         0.,        1.
 	});
@@ -3496,7 +3602,7 @@ requires is_mat<t_mat> && is_complex<typename t_mat::value_type>
 /**
  * phase gate
  * @see (FUH 2021), p. 12
- * @see (Bronstein08), Ch. 22 (Zusatzkapitel.pdf), p. 25
+ * @see (DesktopBronstein08), Ch. 22 (Zusatzkapitel.pdf), p. 25
  */
 template<class t_mat, class t_cplx = typename t_mat::value_type, class t_real = typename t_cplx::value_type>
 const t_mat& phasegate(t_cplx phase = pi<t_real>/t_real(2))
@@ -3515,7 +3621,7 @@ requires is_mat<t_mat> && is_complex<t_cplx>
 
 /**
  * discrete phase gate
- * @see (Bronstein08), Ch. 22 (Zusatzkapitel.pdf), p. 25
+ * @see (DesktopBronstein08), Ch. 22 (Zusatzkapitel.pdf), p. 25
  */
 template<class t_mat, class t_cplx = typename t_mat::value_type, class t_real = typename t_cplx::value_type>
 const t_mat& phasegate_discrete(t_real k = 1)
@@ -3562,7 +3668,7 @@ requires is_mat<t_mat> && is_complex<typename t_mat::value_type>
 
 /**
  * controlled unitary gate
- * @see (Bronstein08), Ch. 22 (Zusatzkapitel.pdf), p. 27
+ * @see (DesktopBronstein08), Ch. 22 (Zusatzkapitel.pdf), p. 27
  */
 template<class t_mat>
 t_mat cunitary(const t_mat& U22, bool flipped = false)
@@ -3868,7 +3974,6 @@ requires is_basic_vec<t_vec>
 	return F;
 }
 
-
 // ----------------------------------------------------------------------------
 
 
@@ -3877,7 +3982,6 @@ requires is_basic_vec<t_vec>
 // ----------------------------------------------------------------------------
 // polarisation
 // ----------------------------------------------------------------------------
-
 
 /**
  * conjugate complex vector
@@ -3935,7 +4039,7 @@ requires is_basic_mat<t_mat>
  * <A> = tr( A * rho )
  * polarisation density matrix: rho = 0.5 * (1 + <P|sigma>)
  *
- * @see (Bronstein08), Ch. 21 (Zusatzkapitel.pdf), pp. 11-12, p. 24
+ * @see (DesktopBronstein08), Ch. 21 (Zusatzkapitel.pdf), pp. 11-12, p. 24
  * @see https://doi.org/10.1016/B978-044451050-1/50006-9
  */
 template<class t_vec, class t_mat>
@@ -3948,7 +4052,7 @@ requires is_vec<t_vec> && is_mat<t_mat>
 
 /**
  * bloch vector
- * @see (Bronstein08), Ch. 22 (Zusatzkapitel.pdf), p. 24
+ * @see (DesktopBronstein08), Ch. 22 (Zusatzkapitel.pdf), p. 24
  */
 template<class t_vec, class t_mat>
 t_vec bloch_vector(const t_mat& state_density)
@@ -4069,7 +4173,392 @@ requires is_mat<t_mat> && is_vec<t_vec>
 	return std::make_tuple(I, P_f/I);
 }
 
+// ----------------------------------------------------------------------------
+
+
+
 
 // ----------------------------------------------------------------------------
+// quaternion algorithms
+// ----------------------------------------------------------------------------
+
+/**
+ * quat1 * quat2
+ * @see https://en.wikipedia.org/wiki/Quaternion#Scalar_and_vector_parts
+ * @see (Kuipers02), pp. 106-110
+ */
+template<class t_quat>
+t_quat mult(const t_quat& quat1, const t_quat& quat2)
+requires m::is_quat<t_quat>
+{
+	/*using T = typename t_quat::value_type;
+	using t_vec = std::vector<T>;
+
+	const T r1 = quat1.real();
+	//const t_vec v1 = quat1.template imag<t_vec>();
+	const t_vec v1{{ quat1(1), quat1(2), quat1(3) }};
+	const T r2 = quat2.real();
+	//const t_vec v2 = quat2.template imag<t_vec>();
+	const t_vec v2{{ quat2(1), quat2(2), quat2(3) }};
+
+	t_quat result(r1*r2 - inner<t_vec>(v1, v2), 0, 0, 0);
+	t_vec v_c = cross<t_vec>({v1, v2});
+
+	for(int i=0; i<3; ++i)
+		result(i+1) = v_c[i] + r1*v2[i] + r2*v1[i];
+
+	return result;*/
+
+	using T = typename t_quat::value_type;
+
+	const T r1 = quat1.real();
+	const T i1 = quat1.imag1();
+	const T j1 = quat1.imag2();
+	const T k1 = quat1.imag3();
+
+	const T r2 = quat2.real();
+	const T i2 = quat2.imag1();
+	const T j2 = quat2.imag2();
+	const T k2 = quat2.imag3();
+
+	return t_quat
+	{
+		r1*r2 - (i1*i2 + j1*j2 + k1*k2),
+		i1*r2 + r1*i2 - k1*j2 + j1*k2,
+		j1*r2 + k1*i2 + r1*j2 - i1*k2,
+		k1*r2 - j1*i2 + i1*j2 + r1*k2
+	};
+}
+
+
+/**
+ * conjugate quaternion
+ * @see https://en.wikipedia.org/wiki/Quaternion#Conjugation,_the_norm,_and_reciprocal
+ * @see also (Kuipers02), pp. 110-111
+ */
+template<class t_quat>
+t_quat conj(const t_quat& quat)
+requires m::is_quat<t_quat>
+{
+	return t_quat
+	{
+		quat.real(),
+		-quat.imag1(),
+		-quat.imag2(),
+		-quat.imag3()
+	};
+}
+
+
+/**
+ * quat * vec
+ * @see (Kuipers02), p. 127
+ */
+template<class t_quat, class t_vec>
+t_vec mult(const t_quat& quat, const t_vec& vec)
+requires m::is_quat<t_quat> && m::is_vec<t_vec>
+{
+	t_quat q_vec{0., vec[0], vec[1], vec[2]};
+
+	t_quat q1 = mult<t_quat>(quat, q_vec);
+	t_quat quat_rot = mult<t_quat>(q1, conj<t_quat>(quat));
+
+	return quat_rot.template imag<t_vec>();
+}
+
+
+/**
+ * squared quaternion norm
+ * @see https://en.wikipedia.org/wiki/Quaternion#Conjugation,_the_norm,_and_reciprocal
+ * @see also (Kuipers02), pp. 111-112
+ */
+template<class t_quat>
+typename t_quat::value_type norm_sq(const t_quat& quat)
+requires m::is_quat<t_quat>
+{
+	using t_val = typename t_quat::value_type;
+
+	t_val r = quat.real();
+	t_val i = quat.imag1();
+	t_val j = quat.imag2();
+	t_val k = quat.imag3();
+
+	return r*r + i*i + j*j + k*k;
+}
+
+
+/**
+ * quaternion norm
+ * @see https://en.wikipedia.org/wiki/Quaternion#Conjugation,_the_norm,_and_reciprocal
+ * @see also (Kuipers02), pp. 111-112
+ */
+template<class t_quat>
+typename t_quat::value_type norm(const t_quat& quat)
+requires m::is_quat<t_quat>
+{
+	return std::sqrt(norm_sq<t_quat>(quat));
+}
+
+
+/**
+ * unit quaternion
+ * @see https://en.wikipedia.org/wiki/Quaternion#Conjugation,_the_norm,_and_reciprocal
+ */
+template<class t_quat>
+t_quat normalise(const t_quat& quat)
+requires m::is_quat<t_quat>
+{
+	using t_val = typename t_quat::value_type;
+
+	t_val n = norm<t_quat>(quat);
+	return quat / n;
+}
+
+
+/**
+ * inverted quaternion
+ * @see https://en.wikipedia.org/wiki/Quaternion#Conjugation,_the_norm,_and_reciprocal
+ * @see also (Kuipers02), p. 112
+ */
+template<class t_quat>
+t_quat inv(const t_quat& quat)
+requires is_quat<t_quat>
+{
+	using t_val = typename t_quat::value_type;
+
+	t_quat quat_c = conj<t_quat>(quat);
+	t_val n = norm_sq<t_quat>(quat);
+
+	return quat_c / n;
+}
+
+
+/**
+ * quat / quat
+ * @see (DesktopBronstein08), chapter 4, equation (4.168)
+ * @see (Bronstein08), chapter 4, p. 297, equation (4.115)
+ * @see also (Kuipers02), p. 112
+ */
+template<class t_quat>
+t_quat div(const t_quat& quat1, const t_quat& quat2)
+requires m::is_quat<t_quat>
+{
+	t_quat quat2_inv = inv<t_quat>(quat2);
+	return mult<t_quat>(quat1, quat2_inv);
+}
+
+
+/**
+ * quaternion exponential
+ * @see https://en.wikipedia.org/wiki/Quaternion#Exponential,_logarithm,_and_power_functions
+ * @see (DesktopBronstein08), chapter 4, equation (4.170)
+ * @see (Bronstein08), chapter 4, p. 297, equation (4.117)
+ */
+template<class t_quat, class t_vec>
+t_quat exp(const t_quat& quat)
+requires is_quat<t_quat> && is_vec<t_vec>
+{
+	if(equals_0<t_quat>(quat))
+		return t_quat{1, 0, 0, 0};
+
+	using t_val = typename t_quat::value_type;
+
+	t_val r = quat.real();
+	t_vec v = quat.template imag<t_vec>();
+	t_val n = norm<t_vec>(v);
+
+	t_val exp_r = std::exp(r);
+	t_val ret_r = exp_r * std::cos(n);
+	t_vec ret_v = exp_r * v/n*std::sin(n);
+
+	return t_quat{ret_r, ret_v[0], ret_v[1], ret_v[2]};
+}
+
+
+/**
+ * quaternion logarithm
+ * @see https://en.wikipedia.org/wiki/Quaternion#Exponential,_logarithm,_and_power_functions
+ */
+template<class t_quat, class t_vec>
+t_quat log(const t_quat& quat)
+requires is_quat<t_quat> && is_vec<t_vec>
+{
+	using t_val = typename t_quat::value_type;
+
+	t_val r = quat.real();
+	t_vec v = quat.template imag<t_vec>();
+	t_val n_v = norm<t_vec>(v);
+	t_val n_q = norm<t_quat>(quat);
+
+	t_val ret_r = std::log(n_q);
+	t_vec ret_v = v/n_v*std::acos(r/n_q);
+
+	return t_quat{ret_r, ret_v[0], ret_v[1], ret_v[2]};
+}
+
+
+/**
+ * quaternion power
+ * @see (DesktopBronstein08), chapter 4, equation (4.180)
+ * @see (Bronstein08), chapter 4, p. 298, equation (4.127)
+ */
+template<class t_quat, class t_vec>
+t_quat pow(const t_quat& quat, typename t_quat::value_type x)
+requires is_quat<t_quat> && is_vec<t_vec>
+{
+	t_quat l = log<t_quat, t_vec>(quat);
+	return exp<t_quat, t_vec>(x * l);
+}
+
+
+/**
+ * unit quaternion from rotation axis and angle (quaternion version of Euler formula)
+ * @see https://en.wikipedia.org/wiki/Quaternion#Exponential,_logarithm,_and_power_functions
+ * @see https://en.wikipedia.org/wiki/Quaternions_and_spatial_rotation
+ * @see (Bronstein08), chapter 4, pp. 301-302
+ */
+template<class t_quat, class t_vec, class t_real = typename t_quat::value_type>
+t_quat from_rotaxis(const t_vec& vec, t_real angle)
+requires is_quat<t_quat> && is_vec<t_vec>
+{
+	t_vec vec_norm = vec / norm<t_vec>(vec);
+
+	t_real ret_r = std::cos(angle * t_real(0.5));
+	t_vec ret_v = std::sin(angle * t_real(0.5)) * vec_norm;
+
+	return t_quat{ret_r, ret_v[0], ret_v[1], ret_v[2]};
+}
+
+
+/**
+ * rotation normalised axis and angle from unit quaternion (quaternion version of Euler formula)
+ * @see https://en.wikipedia.org/wiki/Quaternion#Exponential,_logarithm,_and_power_functions
+ * @see https://en.wikipedia.org/wiki/Quaternions_and_spatial_rotation
+ * @see (Bronstein08), chapter 4, pp. 301-302
+ *
+ * verifying equivalence with rodrigues formula (function rotation()) by applying a test vector x
+ *
+ * (a) rodrigues with (normalised) rotation axis v and angle alpha:
+ * 	(|v><v| + (1-|v><v|) cos(alpha) + Px sin(alpha)) |x> =
+ * 	|v><v|x> + |x> cos(alpha) - |v><v|x> cos(alpha) + v⨯x sin(alpha) =
+ * 	(1 - cos(alpha)) |v><v|x> + |x> cos(alpha) + v⨯x sin(alpha)
+ *
+ * (b) quaternion:
+ * 	(cos(alpha/2), v sin(alpha/2)) * (0, x) * (cos(alpha/2), -v sin(alpha/2)) =
+ * 	(-v*x sin(alpha/2), v⨯x sin(alpha/2) + cos(alpha/2)*x) * (cos(alpha/2), -v sin(alpha/2))
+ *
+ * 	scalar part:
+ * 		-v*x sin(alpha/2)*cos(alpha/2) + (v⨯x sin(alpha/2) + cos(alpha/2)*x)*v sin(alpha/2) =
+ * 		-v*x sin(alpha/2)*cos(alpha/2) + v⨯x*v sin^2(alpha/2) + cos(alpha/2)*sin(alpha/2) x*v =
+ * 		v⨯x*v sin^2(alpha/2) = 0
+ *
+ * 	vector part:
+ * 		(v⨯x sin(alpha/2) + cos(alpha/2)*x) ⨯ (-v sin(alpha/2)) + (-v*x sin(alpha/2))*(-v sin(alpha/2)) + cos(alpha/2)*(v⨯x sin(alpha/2) + cos(alpha/2)*x) =
+ * 		- v⨯x⨯v sin^2(alpha/2) - x⨯v cos(alpha/2)*sin(alpha/2) + v*x*v sin^2(alpha/2) + v⨯x sin(alpha/2)*cos(alpha/2) + x cos^2(alpha/2) =
+ * 		- v⨯x⨯v sin^2(alpha/2) - 2 x⨯v cos(alpha/2)*sin(alpha/2) + v*x*v sin^2(alpha/2) + x cos^2(alpha/2) =
+ * 		0.5 * (- v⨯x⨯v + v*x*v) - 0.5 *cos(alpha) * (- v⨯x⨯v + v*x*v) - x⨯v sin(alpha) + 0.5*x + 0.5*x cos(alpha) =
+ * 		- 0.5*v⨯x⨯v + 0.5*v*x*v + 0.5 v⨯x⨯v cos(alpha) - 0.5*v*x*v cos(alpha) - x⨯v sin(alpha) + 0.5*x + 0.5*x cos(alpha) =
+ * 		- 0.5*(x*(v*v) - v*(v*x)) + 0.5*v*x*v + 0.5 (x*(v*v) - v*(v*x)) cos(alpha) - 0.5*v*x*v cos(alpha) - x⨯v sin(alpha) + 0.5*x + 0.5*x cos(alpha) =
+ * 		v*x*v - v*x*v cos(alpha) + v⨯x sin(alpha) + x cos(alpha) =
+ * 		(1 - cos(alpha)) |v><v|x> + |x> cos(alpha) + v⨯x sin(alpha) ∎
+ */
+template<class t_quat, class t_vec, class t_real = typename t_quat::value_type>
+std::tuple<t_vec, t_real> to_rotaxis(const t_quat& quat)
+requires is_quat<t_quat> && is_vec<t_vec>
+{
+	t_real r = quat.real();
+	t_vec v = quat.template imag<t_vec>();
+	t_real n_q = norm<t_quat>(quat);
+
+	t_real angle = std::acos(r/n_q);
+	t_vec vec = v / (n_q * std::sin(angle));
+
+	return std::make_tuple(vec, angle * t_real(2.));
+}
+
+
+/**
+ * convert a quaternion to an su(2) matrix
+ * @see (DesktopBronstein08), chapter 4, equations (4.163a) and (4.163b)
+ * @see (Bronstein08), chapter 4, p. 296, equation (4.110a) and (4.110b)
+ */
+template<class t_quat, class t_vec, class t_mat_cplx,
+	class t_real = typename t_quat::value_type,
+	class t_cplx = typename t_mat_cplx::value_type>
+t_mat_cplx to_su2(const t_quat& quat)
+requires is_quat<t_quat> && is_vec<t_vec> && is_mat<t_mat_cplx>
+{
+	constexpr t_cplx c0(0,0);
+	constexpr t_cplx c1(1,0);
+	constexpr t_cplx cI(0,1);
+
+	static const t_mat_cplx base[] =
+	{
+		create<t_mat_cplx>({{  c1,  c0}, {  c0,  c1 }}),	// real part
+		create<t_mat_cplx>({{  c0, -cI}, { -cI,  c0 }}),	// i
+		create<t_mat_cplx>({{  c0,  c1}, { -c1,  c0 }}),	// j
+		create<t_mat_cplx>({{ -cI,  c0}, {  c0,  cI }}),	// k
+	};
+
+	return
+		base[0] * t_cplx(quat.real()) +
+		base[1] * t_cplx(quat.imag1()) +
+		base[2] * t_cplx(quat.imag2()) +
+		base[3] * t_cplx(quat.imag3());
+}
+
+
+/**
+ * convert a quaternion to an so(3) matrix
+ * @see (DesktopBronstein08), chapter 4, equation (4.194)
+ * @see (Bronstein08), chapter 4, p. 301, equation (4.142)
+ */
+template<class t_quat, class t_vec, class t_mat, class t_real = typename t_quat::value_type>
+t_mat to_so3(const t_quat& quat)
+requires is_quat<t_quat> && is_vec<t_vec> && is_mat<t_mat>
+{
+	t_quat quat_conj = conj<t_quat>(quat);
+
+	t_quat quat1 = mult<t_quat>(mult<t_quat>(quat, t_quat(0, 1, 0, 0)), quat_conj);
+	t_quat quat2 = mult<t_quat>(mult<t_quat>(quat, t_quat(0, 0, 1, 0)), quat_conj);
+	t_quat quat3 = mult<t_quat>(mult<t_quat>(quat, t_quat(0, 0, 0, 1)), quat_conj);
+
+	return create<t_mat, t_vec>({
+		quat1.template imag<t_vec>(),
+		quat2.template imag<t_vec>(),
+		quat3.template imag<t_vec>()
+	});
+}
+
+
+/**
+ * linear interpolation
+ * @see (DesktopBronstein08), chapter 4, equation (4.206)
+ * @see (Bronstein08), chapter 4, p. 306, equation (4.154)
+ */
+template<class t_quat, class t_real = typename t_quat::value_type>
+t_quat lerp(const t_quat& quat1, const t_quat& quat2, t_real t)
+requires is_quat<t_quat>
+{
+	return (t_real{1}-t)*quat1 + t*quat2;
+}
+
+
+/**
+ * spherical linear interpolation
+ * @see (DesktopBronstein08), chapter 4, equation (4.207)
+ * @see (Bronstein08), chapter 4, p. 306, equation (4.155)
+ */
+template<class t_quat, class t_vec, class t_real = typename t_quat::value_type>
+t_quat slerp(const t_quat& quat1, const t_quat& quat2, t_real t)
+requires is_quat<t_quat>
+{
+	t_quat quat1_conj = conj<t_quat>(quat1);
+	t_quat p = pow<t_quat, t_vec>(quat1_conj * quat2, t);
+	return quat1 * p;
+}
+
+// ----------------------------------------------------------------------------
+
 }
 #endif

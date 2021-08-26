@@ -197,12 +197,29 @@ requires m::is_vec<t_vec>
 }
 
 
+/**
+ * returns > 0 if point is on the left-hand side of line
+ */
+template<class t_vec, class t_real = typename t_vec::value_type>
+t_real side_of_line(const t_vec& vec1a, const t_vec& vec1b, const t_vec& pt)
+requires m::is_vec<t_vec>
+{
+	//return line_angle<t_vec>(vec1a, pt) - line_angle<t_vec>(vec1a, vec1b);
+	using namespace m_ops;
+
+	t_vec dir1 = vec1b - vec1a;
+	t_vec dir2 = pt - vec1a;
+
+	return dir1[0]*dir2[1] - dir1[1]*dir2[0];
+}
+
+
 template<class t_vec> requires m::is_vec<t_vec>
 std::pair<bool, t_vec> intersect_lines(
 	const t_vec& pos1a, const t_vec& pos1b,
 	const t_vec& pos2a, const t_vec& pos2b,
 	bool only_segments = true,
-	typename t_vec::value_type eps=std::numeric_limits<typename t_vec::value_type>::epsilon())
+	typename t_vec::value_type eps = std::numeric_limits<typename t_vec::value_type>::epsilon())
 {
 	t_vec dir1 = pos1b - pos1a;
 	t_vec dir2 = pos2b - pos2a;
@@ -235,6 +252,45 @@ std::pair<bool, t_vec> intersect_lines(
 	// to rule out numeric instability
 	bool alternatives_equal = m::equals<t_vec>(pt1, pt2, eps);
 	return std::make_pair(alternatives_equal, pt1);
+}
+
+
+/**
+ * only check if two 2d lines intersect without calculating the point of intersection
+ */
+template<class t_vec, class t_real = typename t_vec::value_type>
+bool intersect_lines_check(const t_vec& line1a, const t_vec& line1b,
+	const t_vec& line2a, const t_vec& line2b, t_real eps_range = 0)
+requires m::is_vec<t_vec>
+{
+	bool on_lhs_1 = (side_of_line<t_vec, t_real>(line1a, line1b, line2a) >= eps_range);
+	bool on_lhs_2 = (side_of_line<t_vec, t_real>(line1a, line1b, line2b) >= eps_range);
+
+	// both points of line2 on the same side of line1?
+	if(on_lhs_1 == on_lhs_2)
+		return false;
+
+	on_lhs_1 = (side_of_line<t_vec, t_real>(line2a, line2b, line1a) >= eps_range);
+	on_lhs_2 = (side_of_line<t_vec, t_real>(line2a, line2b, line1b) >= eps_range);
+
+	// both points of line1 on the same side of line2?
+	if(on_lhs_1 == on_lhs_2)
+		return false;
+
+	return true;
+}
+
+
+/**
+ * only check if two 2d lines intersect without calculating the point of intersection
+ */
+template<class t_vec, class t_line = std::pair<t_vec, t_vec>, class t_real = typename t_vec::value_type>
+bool intersect_lines_check(const t_line& line1, const t_line& line2, t_real eps_range = 0)
+requires m::is_vec<t_vec>
+{
+	return intersect_lines_check<t_vec, t_real>(
+		std::get<0>(line1), std::get<1>(line1),
+		std::get<0>(line2), std::get<1>(line2), eps_range);
 }
 
 
@@ -370,23 +426,6 @@ requires m::is_vec<t_vec>
 		std::get<0>(line1), std::get<1>(line1),
 		std::get<0>(line2), std::get<1>(line2),
 		true, eps);
-}
-
-
-/**
- * returns > 0 if point is on the left-hand side of line
- */
-template<class t_vec, class t_real = typename t_vec::value_type>
-t_real side_of_line(const t_vec& vec1a, const t_vec& vec1b, const t_vec& pt)
-requires m::is_vec<t_vec>
-{
-	//return line_angle<t_vec>(vec1a, pt) - line_angle<t_vec>(vec1a, vec1b);
-	using namespace m_ops;
-
-	t_vec dir1 = vec1b - vec1a;
-	t_vec dir2 = pt - vec1a;
-
-	return dir1[0]*dir2[1] - dir1[1]*dir2[0];
 }
 
 
@@ -2312,11 +2351,15 @@ requires m::is_vec<t_vec>
 // @see (FUH 2020), ch. 2.3.2, pp. 69-80
 // ----------------------------------------------------------------------------
 
+/**
+ * check which lines in a collection intersect
+ */
 template<class t_vec, class t_line = std::pair<t_vec, t_vec>, class t_real = typename t_vec::value_type>
 std::vector<std::tuple<std::size_t, std::size_t, t_vec>>
 intersect_ineff(const std::vector<t_line>& lines, t_real eps = 1e-6)
 requires m::is_vec<t_vec>
 {
+	// [intersecting line index 1, intersecting line index 2, intersection point]
 	std::vector<std::tuple<std::size_t, std::size_t, t_vec>> intersections;
 
 	for(std::size_t i=0; i<lines.size(); ++i)
@@ -2335,6 +2378,9 @@ requires m::is_vec<t_vec>
 }
 
 
+/**
+ * compare two lines for their order
+ */
 template<class t_vec, class t_line = std::pair<t_vec, t_vec>>
 requires m::is_vec<t_vec>
 bool cmp_line(const t_line& line1, const t_line& line2,
