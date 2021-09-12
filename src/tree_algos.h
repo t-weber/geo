@@ -1,6 +1,6 @@
 /**
  * tree algos
- * @author Tobias Weber
+ * @author Tobias Weber (orcid: 0000-0002-7230-1932)
  * @date may-2021
  * @license see 'LICENSE' file
  */
