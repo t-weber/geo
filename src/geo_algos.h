@@ -2,7 +2,7 @@
  * geometric calculations
  * @author Tobias Weber (orcid: 0000-0002-7230-1932)
  * @date Oct/Nov-2020
- * @license: see 'LICENSE' file
+ * @license see 'LICENSE' file
  *
  * Reference for the algorithms:
  *   - (Klein 2005) "Algorithmische Geometrie" (2005), ISBN: 978-3540209560 (http://dx.doi.org/10.1007/3-540-27619-X).
