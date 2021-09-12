@@ -97,18 +97,27 @@ struct CommonTreeNode
 	CommonTreeNode() {}
 	CommonTreeNode(const std::shared_ptr<const t_vec>& vec) : vec{vec} {}
 
+
 	CommonTreeNode(const CommonTreeNode<t_vec, t_nodetype>& other)
 	{
 		*this = operator=(other);
 	}
 
-	const CommonTreeNode<t_vec, t_nodetype>& operator=(const CommonTreeNode<t_vec, t_nodetype>& other)
+	CommonTreeNode<t_vec, t_nodetype>& operator=(const CommonTreeNode<t_vec, t_nodetype>& other)
 	{
 		this->parent = other.parent;
 		this->left = other.left;
 		this->right = other.right;
 		this->vec = other.vec;
+
+		return *this;
 	}
+
+
+	CommonTreeNode(CommonTreeNode<t_vec, t_nodetype>&& other) = default;
+
+	CommonTreeNode<t_vec, t_nodetype>& operator=(
+		CommonTreeNode<t_vec, t_nodetype>&& other) = default;
 };
 
 
