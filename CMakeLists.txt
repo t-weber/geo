@@ -14,6 +14,7 @@ find_package(Qt5Widgets REQUIRED)
 find_package(Qt5Svg REQUIRED)
 find_package(Boost REQUIRED)
 find_package(Threads REQUIRED)
+#find_package(GMP REQUIRED)
 
 
 set(CMAKE_AUTOUIC ON)
@@ -77,6 +78,7 @@ target_link_libraries(lines
 	Qt5::Core Qt5::Gui Qt5::Widgets Qt5::Svg
 	${Boost_LIBRARIES}
 	Threads::Threads
+	-lgmp
 )
 
 

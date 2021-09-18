@@ -36,6 +36,9 @@ namespace asio = boost::asio;
 namespace ptree = boost::property_tree;
 
 
+// calculation backend: 1 = boost.polygon, 2 = cgal
+#define VORO_BACKEND 1
+
 
 // ----------------------------------------------------------------------------
 
@@ -367,8 +370,14 @@ void LinesScene::UpdateVoro()
 		return;
 
 	// get vertices and bisectors
+#if VORO_BACKEND == 1
 	auto [vertices, linear_edges, linear_inf_edges, all_parabolic_edges, linear_helper_edges, graph]
 		= g::calc_voro<t_vec, std::pair<t_vec, t_vec>, decltype(m_vorograph)>(m_lines);
+#elif VORO_BACKEND == 2
+	auto [vertices, linear_edges, linear_inf_edges, all_parabolic_edges, linear_helper_edges, graph]
+		= g::calc_voro_cgal<t_vec, std::pair<t_vec, t_vec>, decltype(m_vorograph)>(m_lines);
+#endif
+
 	m_vorograph = std::move(graph);
 
 	// linear finite voronoi edges
