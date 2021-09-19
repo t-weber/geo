@@ -45,6 +45,13 @@ enum class IntersectionCalculationMethod
 };
 
 
+enum class VoronoiCalculationMethod
+{
+	BOOST,
+	CGAL,
+};
+
+
 
 class LinesScene : public QGraphicsScene
 {
@@ -74,6 +81,7 @@ public:
 	void UpdateIntersections();
 
 	void SetIntersectionCalculationMethod(IntersectionCalculationMethod m);
+	void SetVoronoiCalculationMethod(VoronoiCalculationMethod m);
 
 	void CreateVoroImage(int width, int height);
 	void UpdateVoroImage(const QTransform& trafoSceneToVP);
@@ -99,6 +107,7 @@ private:
 	t_graph m_vorograph{};
 
 	IntersectionCalculationMethod m_intersectioncalculationmethod = IntersectionCalculationMethod::SWEEP;
+	VoronoiCalculationMethod m_voronoicalculationmethod = VoronoiCalculationMethod::CGAL;
 
 private:
 	std::size_t GetClosestLineIdx(const t_vec& pt) const;

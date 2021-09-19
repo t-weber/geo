@@ -1227,7 +1227,7 @@ requires m::is_vec<t_vec>
 // ----------------------------------------------------------------------------
 
 /**
- * voronoi diagram for line segments
+ * voronoi diagram for line segments (using boost)
  * @see https://github.com/boostorg/polygon/blob/develop/example/voronoi_basic_tutorial.cpp
  * @see https://github.com/boostorg/polygon/blob/develop/example/voronoi_visual_utils.hpp
  * @see https://github.com/boostorg/polygon/blob/develop/example/voronoi_visualizer.cpp
@@ -1251,7 +1251,7 @@ requires m::is_vec<t_vec> && is_graph<t_graph>
 	using t_real = typename t_vec::value_type;
 	namespace poly = boost::polygon;
 
-	t_real parabola_eps = 1e-3;
+	const t_real parabola_eps = 1e-3;
 
 	// length of infinite edges
 	t_real infline_len = 1.;
@@ -1511,10 +1511,10 @@ requires m::is_vec<t_vec> && is_graph<t_graph>
 
 
 /**
- * voronoi diagram for line segments
+ * voronoi diagram for line segments (using cgal)
  * @see https://github.com/CGAL/cgal/blob/master/Segment_Delaunay_graph_2/examples/Segment_Delaunay_graph_2/sdg-voronoi-edges.cpp
- * @see https://github.com/CGAL/cgal/blob/master/Segment_Delaunay_graph_2/include/CGAL/Segment_Delaunay_graph_2/Segment_Delaunay_graph_2_impl.h
  * @see https://github.com/CGAL/cgal/blob/master/Voronoi_diagram_2/examples/Voronoi_diagram_2/vd_2_point_location_sdg_linf.cpp
+ * @see https://github.com/CGAL/cgal/blob/master/Segment_Delaunay_graph_2/include/CGAL/Segment_Delaunay_graph_2/Segment_Delaunay_graph_2_impl.h
  * @see https://doc.cgal.org/latest/Segment_Delaunay_graph_2/index.html
  * @see https://doc.cgal.org/latest/Voronoi_diagram_2/index.html
  */
@@ -1533,9 +1533,8 @@ calc_voro_cgal(const std::vector<t_line>& lines)
 requires m::is_vec<t_vec> && is_graph<t_graph>
 {
 #ifdef __GEO2D_USE_CGAL_SDG2__
-	namespace cgal = ::CGAL;
-
 	using t_real = typename t_vec::value_type;
+	const t_real eps = std::sqrt(std::numeric_limits<t_real>::epsilon());
 
 	// length of infinite edges
 	t_real infline_len = 1.;
@@ -1548,6 +1547,7 @@ requires m::is_vec<t_vec> && is_graph<t_graph>
 	infline_len *= 10.;
 
 	// kernel type
+	namespace cgal = ::CGAL;
 	using t_kernel = cgal::Filtered_kernel<cgal::Simple_cartesian<t_real>>;
 
 	// delaunay and voronoi types
@@ -1572,64 +1572,65 @@ requires m::is_vec<t_vec> && is_graph<t_graph>
 	t_delgraph delgraph;
 
 
-	// insert sites
+	// insert all sites
+	//std::vector<t_vec> all_sites{};
+	//all_sites.reserve(lines.size()*2);
+
 	for(const t_line& line : lines)
 	{
 		const t_vec& pt0 = std::get<0>(line);
 		const t_vec& pt1 = std::get<1>(line);
 
-		/*std::stringstream iostr;
-		iostr.precision(8);
-		iostr << "s " << pt0[0] << " " << pt0[1] << " " << pt1[0] << " " << pt1[1] << "\n";
-		t_site site;
-		iostr >> site;*/
-
 		t_point point0(pt0[0], pt0[1]);
 		t_point point1(pt1[0], pt1[1]);
 		t_site site = t_site::construct_site_2(point0, point1);
 
-		//std::cout << "input site: " << site << std::endl;
 		delgraph.insert(site);
+
+		//all_sites.push_back(pt0);
+		//all_sites.push_back(pt1);
 	}
 
 
 	// graph of voronoi vertices
-	t_graph graph;
+	t_graph graph{};
 
 	// voronoi vertices
-	std::vector<t_vec> vertices;
+	std::vector<t_vec> vertices{};
 
-	// voronoi edges
-	std::vector<std::vector<t_vec>> all_parabolic_edges;
-	std::vector<t_line> linear_edges, linear_inf_edges, linear_helper_edges;
+	// voronoi and helper edges
+	std::vector<std::vector<t_vec>> all_parabolic_edges{};
+	std::vector<t_line> linear_edges{}, linear_inf_edges{};
+	std::vector<t_line> linear_helper_edges{};
+
+
+	auto get_vertex_idx = [&vertices, eps](const t_vec& vert) -> std::optional<std::size_t>
+	{
+		for(std::size_t idx=0; idx<vertices.size(); ++idx)
+		{
+			const t_vec& vertex = vertices[idx];
+			if(m::equals<t_vec>(vert, vertex, eps))
+				return idx;
+		}
+
+		return std::nullopt;
+	};
 
 
 	if(delgraph.is_valid(false /*verbose*/))
 	{
-		const auto& triag = delgraph.tds();
+		//const auto& triag = delgraph.tds();
 
 		// voronoi diagram from delaunay triangulation
 		t_voronoi voronoi(delgraph);
 		vertices.reserve(voronoi.number_of_vertices());
 
 		// iterate voronoi vertices
-		for(auto iter = voronoi.vertices_begin(); iter != voronoi.vertices_end(); ++iter)
+		for(auto iter = voronoi.vertices_begin(); iter.operator!=(voronoi.vertices_end()); ++iter)
 		{
 			vertices.emplace_back(m::create<t_vec>({ iter->point()[0], iter->point()[1] }));
+			graph.AddVertex(std::to_string(vertices.size()));
 		}
-
-		// iterate finite voronoi edges
-		/*for(auto iter = voronoi.halfedges_begin(); iter != voronoi.halfedges_end(); ++iter)
-		{
-			// finite edge
-			if(iter->has_source() && iter->has_target())
-			{
-				t_vec vert0 = m::create<t_vec>({ iter->source()->point()[0], iter->source()->point()[1] });
-				t_vec vert1 = m::create<t_vec>({ iter->target()->point()[0], iter->target()->point()[1] });
-
-				linear_edges.emplace_back(std::make_pair(vert0, vert1));
-			}
-		}*/
 
 		// iterate voronoi edges
 		for(auto iter = delgraph.finite_edges_begin(); iter != delgraph.finite_edges_end(); ++iter)
@@ -1637,8 +1638,25 @@ requires m::is_vec<t_vec> && is_graph<t_graph>
 			if(delgraph.is_infinite(*iter))
 				continue;
 
-			// TODO
-			bool is_helper_edge = false;
+			const auto& face = std::get<0>(*iter);
+
+			// get face vertex indices
+			int idx = std::get<1>(*iter);
+			int idx_cw = delgraph.cw(idx);
+			int idx_ccw = delgraph.ccw(idx);
+
+			// get sites
+			//auto vert = face->vertex(idx);
+			//auto vert_mirror = triag.mirror_vertex(face, idx);
+			auto vert_cw = face->vertex(idx_cw);
+			auto vert_ccw = face->vertex(idx_ccw);
+
+			// add sites to check if an edge runs through them
+			std::vector<t_vec> sites{};
+			if(!delgraph.is_infinite(vert_cw) && vert_cw->site().is_point())
+				sites.emplace_back(m::create<t_vec>({ vert_cw->site().point()[0], vert_cw->site().point()[1] }));
+			if(!delgraph.is_infinite(vert_ccw) && vert_ccw->site().is_point())
+				sites.emplace_back(m::create<t_vec>({ vert_ccw->site().point()[0], vert_ccw->site().point()[1] }));
 
 			// get voronoi edge
 			auto dual = delgraph.primal(*iter);
@@ -1649,14 +1667,41 @@ requires m::is_vec<t_vec> && is_graph<t_graph>
 				t_vec vert0 = m::create<t_vec>({ seg.source()[0], seg.source()[1] });
 				t_vec vert1 = m::create<t_vec>({ seg.target()[0], seg.target()[1] });
 
+				//using namespace m_ops;
+				//std::cout << "linear, finite edge: " << vert0 << " -> " << vert1 << std::endl;
+
+				// if the edge runs through a site, it's not a voronoi edge
+				bool is_helper_edge = false;
+				for(const t_vec& site : /*all_*/sites)
+				{
+					is_helper_edge = m::equals_0<t_real>(m::dist_pt_line<t_vec>(site, vert0, vert1, true), eps);
+					if(is_helper_edge)
+						break;
+				}
+
 				if(is_helper_edge)
+				{
 					linear_helper_edges.emplace_back(std::make_pair(vert0, vert1));
+				}
 				else
+				{
+					// add graph edges
+					auto vert0idx = get_vertex_idx(vert0);
+					auto vert1idx = get_vertex_idx(vert1);
+
+					if(vert0idx && vert1idx)
+					{
+						t_real len = m::norm(vertices[*vert1idx] - vertices[*vert0idx]);
+						graph.AddEdge(*vert0idx, *vert1idx, len);
+						graph.AddEdge(*vert1idx, *vert0idx, len);
+					}
+
 					linear_edges.emplace_back(std::make_pair(vert0, vert1));
+				}
 			}
 
 			// linear, infinite edge
-			if(t_ray ray; cgal::assign(ray, dual))
+			else if(t_ray ray; cgal::assign(ray, dual))
 			{
 				t_vec vert0 = m::create<t_vec>({ ray.source()[0], ray.source()[1] });
 				t_vec vert1 = m::create<t_vec>({ ray.second_point()[0], ray.second_point()[1] });
@@ -1665,6 +1710,18 @@ requires m::is_vec<t_vec> && is_graph<t_graph>
 				dir /= m::norm(dir);
 				dir *= infline_len;
 
+				//using namespace m_ops;
+				//std::cout << "linear, infinite edge: " << vert0 << " -> " << vert1 << std::endl;
+
+				// if the edge runs through a site, it's not a voronoi edge
+				bool is_helper_edge = false;
+				for(const t_vec& site : /*all_*/sites)
+				{
+					is_helper_edge = m::equals_0<t_real>(m::dist_pt_line<t_vec>(site, vert0, vert1, true), eps);
+					if(is_helper_edge)
+						break;
+				}
+
 				if(is_helper_edge)
 					linear_helper_edges.emplace_back(std::make_pair(vert0, vert0 + dir));
 				else
@@ -1672,7 +1729,7 @@ requires m::is_vec<t_vec> && is_graph<t_graph>
 			}
 
 			// parabolic, finite edge
-			if(t_paraseg paraseg; cgal::assign(paraseg, dual))
+			else if(t_paraseg paraseg; cgal::assign(paraseg, dual))
 			{
 				std::vector<t_point> points;
 				t_real step = 2;
@@ -1683,6 +1740,22 @@ requires m::is_vec<t_vec> && is_graph<t_graph>
 				for(const t_point& point : points)
 					parabolic_edge.emplace_back(m::create<t_vec>({ point[0], point[1] }));
 
+				// add graph edges
+				if(parabolic_edge.size() >= 2)
+				{
+					auto vert0idx = get_vertex_idx(*parabolic_edge.begin());
+					auto vert1idx = get_vertex_idx(*parabolic_edge.rbegin());
+
+					if(vert0idx && vert1idx)
+					{
+						// TODO: arc length of parabolic edges
+						t_real len = m::norm(vertices[*vert1idx] - vertices[*vert0idx]);
+						graph.AddEdge(*vert0idx, *vert1idx, len);
+						graph.AddEdge(*vert1idx, *vert0idx, len);
+					}
+				}
+
+				//std::cout << "parabolic edge" << std::endl;
 				all_parabolic_edges.emplace_back(std::move(parabolic_edge));
 			}
 		}

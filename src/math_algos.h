@@ -456,6 +456,17 @@ requires is_basic_quat<t_quat>
 
 
 /**
+ * tests for zero scalar
+ */
+template<class t_scalar>
+bool equals_0(t_scalar s, t_scalar eps = std::numeric_limits<t_scalar>::epsilon())
+requires is_scalar<t_scalar>
+{
+	return equals<t_scalar>(s, t_scalar{0}, eps);
+}
+
+
+/**
  * tests for zero vector
  */
 template<class t_vec>
@@ -1115,7 +1126,7 @@ requires is_vec<t_vec>
 template<class t_vec, class t_real = typename t_vec::value_type>
 t_real dist_pt_line(const t_vec& pt,
 	const t_vec& linePt1, const t_vec& linePt2,
-	bool bLineIsFinite=true)
+	bool bLineIsInfinite = true)
 requires is_vec<t_vec>
 {
 	using t_size = decltype(pt.size());
@@ -1140,7 +1151,7 @@ requires is_vec<t_vec>
 
 
 	t_real t = (nearestPt[compidx]-linePt1[compidx]) / (linePt2[compidx]-linePt1[compidx]);
-	if(bLineIsFinite && t>=t_real{0} && t<=t_real{1})
+	if(bLineIsInfinite || (t>=t_real{0} && t<=t_real{1}))
 	{
 		// projection is on line -> use distance between point and projection
 		return dist;

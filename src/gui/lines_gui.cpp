@@ -36,10 +36,6 @@ namespace asio = boost::asio;
 namespace ptree = boost::property_tree;
 
 
-// calculation backend: 1 = boost.polygon, 2 = cgal
-#define VORO_BACKEND 1
-
-
 // ----------------------------------------------------------------------------
 
 Vertex::Vertex(const QPointF& pos, double rad) : m_rad{rad}
@@ -146,6 +142,13 @@ void LinesScene::SetIntersectionCalculationMethod(IntersectionCalculationMethod 
 {
 	m_intersectioncalculationmethod = m;
 	UpdateIntersections();
+}
+
+
+void LinesScene::SetVoronoiCalculationMethod(VoronoiCalculationMethod m)
+{
+	m_voronoicalculationmethod = m;
+	UpdateVoro();
 }
 
 
@@ -344,7 +347,7 @@ std::size_t LinesScene::GetClosestLineIdx(const t_vec& pt) const
 	{
 		const auto& line = m_lines[idx];
 
-		t_real dist = dist_pt_line(pt, line.first, line.second, true);
+		t_real dist = dist_pt_line(pt, line.first, line.second, false);
 		if(dist < mindist)
 		{
 			mindist = dist;
@@ -369,16 +372,26 @@ void LinesScene::UpdateVoro()
 	if(!m_calcvoro)
 		return;
 
-	// get vertices and bisectors
-#if VORO_BACKEND == 1
-	auto [vertices, linear_edges, linear_inf_edges, all_parabolic_edges, linear_helper_edges, graph]
-		= g::calc_voro<t_vec, std::pair<t_vec, t_vec>, decltype(m_vorograph)>(m_lines);
-#elif VORO_BACKEND == 2
-	auto [vertices, linear_edges, linear_inf_edges, all_parabolic_edges, linear_helper_edges, graph]
-		= g::calc_voro_cgal<t_vec, std::pair<t_vec, t_vec>, decltype(m_vorograph)>(m_lines);
-#endif
 
-	m_vorograph = std::move(graph);
+	using t_line = std::pair<t_vec, t_vec>;
+
+	// get vertices and bisectors
+	std::vector<t_vec> vertices{};
+	std::vector<t_line> linear_edges{}, linear_inf_edges{};
+	std::vector<std::vector<t_vec>> all_parabolic_edges{};
+	std::vector<t_line> linear_helper_edges{};
+
+	switch(m_voronoicalculationmethod)
+	{
+		case VoronoiCalculationMethod::BOOST:
+			std::tie(vertices, linear_edges, linear_inf_edges, all_parabolic_edges, linear_helper_edges, m_vorograph)
+				= g::calc_voro<t_vec, t_line, decltype(m_vorograph)>(m_lines);
+			break;
+		case VoronoiCalculationMethod::CGAL:
+			std::tie(vertices, linear_edges, linear_inf_edges, all_parabolic_edges, linear_helper_edges, m_vorograph)
+				= g::calc_voro_cgal<t_vec, t_line, decltype(m_vorograph)>(m_lines);
+			break;
+	}
 
 	// linear finite voronoi edges
 	QPen penLinEdge;
@@ -817,6 +830,7 @@ LinesWnd::LinesWnd(QWidget* pParent) : QMainWindow{pParent},
 	});
 
 
+	// intersection backend
 	QAction *actionIntersDirect = new QAction{"Direct", this};
 	actionIntersDirect->setCheckable(true);
 	actionIntersDirect->setChecked(false);
@@ -830,15 +844,34 @@ LinesWnd::LinesWnd(QWidget* pParent) : QMainWindow{pParent},
 	{ m_scene->SetIntersectionCalculationMethod(IntersectionCalculationMethod::SWEEP); });
 
 
+	// voronoi backend
+	QAction *actionVoroBoost = new QAction{"Boost", this};
+	actionVoroBoost->setCheckable(true);
+	actionVoroBoost->setChecked(false);
+	connect(actionVoroBoost, &QAction::toggled, [this]()
+	{ m_scene->SetVoronoiCalculationMethod(VoronoiCalculationMethod::BOOST); });
+
+	QAction *actionVoroCGAL = new QAction{"CGAL", this};
+	actionVoroCGAL->setCheckable(true);
+	actionVoroCGAL->setChecked(true);
+	connect(actionVoroCGAL, &QAction::toggled, [this]()
+	{ m_scene->SetVoronoiCalculationMethod(VoronoiCalculationMethod::CGAL); });
+
+
+	// groups
 	QActionGroup *groupInters = new QActionGroup{this};
 	groupInters->addAction(actionIntersDirect);
 	groupInters->addAction(actionIntersSweep);
+
+	QActionGroup *groupVoro = new QActionGroup{this};
+	groupVoro->addAction(actionVoroBoost);
+	groupVoro->addAction(actionVoroCGAL);
 
 
 	// menu
 	QMenu *menuFile = new QMenu{"File", this};
 	QMenu *menuCalc = new QMenu{"Calculate", this};
-	QMenu *menuBack = new QMenu{"Backend", this};
+	QMenu *menuBack = new QMenu{"Backends", this};
 
 	menuFile->addAction(actionNew);
 	menuFile->addSeparator();
@@ -857,6 +890,9 @@ LinesWnd::LinesWnd(QWidget* pParent) : QMainWindow{pParent},
 
 	menuBack->addAction(actionIntersDirect);
 	menuBack->addAction(actionIntersSweep);
+	menuBack->addSeparator();
+	menuBack->addAction(actionVoroBoost);
+	menuBack->addAction(actionVoroCGAL);
 
 
 	// menu bar
