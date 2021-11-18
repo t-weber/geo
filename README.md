@@ -1,5 +1,5 @@
 # geo
-Basic geometry algorithms and calculations.
+Basic geometry algorithms concerning convex hull calculation, point and line-segment Voronoi diagrams, and Delaunay triangulation.
 
 [![DOI: 10.5281/zenodo.4297475](https://zenodo.org/badge/DOI/10.5281/zenodo.4297475.svg)](https://doi.org/10.5281/zenodo.4297475)
 
