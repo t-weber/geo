@@ -8,7 +8,6 @@
 #ifndef __TREE_ALGOS_H__
 #define __TREE_ALGOS_H__
 
-
 #include <memory>
 #include <functional>
 #include <unordered_map>

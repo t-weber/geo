@@ -5,8 +5,7 @@
  * @license see 'LICENSE' file
  *
  * references:
- *   - (FUH 2021) "Effiziente Algorithmen" (2021), Kurs 1684, Fernuni Hagen
- *                (https://vu.fernuni-hagen.de/lvuweb/lvu/app/Kurs/01684).
+ *   - (FUH 2021): A. Schulz and J. Rollin, "Effiziente Algorithmen", Kurs 1684 (2021), Fernuni Hagen (https://vu.fernuni-hagen.de/lvuweb/lvu/app/Kurs/01684).
  */
 
 #ifndef __GRAPH_CONTS_H__

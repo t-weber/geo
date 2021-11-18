@@ -5,9 +5,9 @@
  * @license: see 'LICENSE' file
  *
  * @see general references for algorithms:
- *	- (DesktopBronstein08): I. N. Bronstein et al., ISBN: 978-3-8171-2017-8 (2008) [in its HTML version "Desktop Bronstein"].
- * 	- (Bronstein08): I. N. Bronstein et al., ISBN: 978-3-8171-2017-8 (2008) [in its paperback version].
- *	- (Kuipers02): J. B. Kuipers, ISBN: 0-691-05872-5 (2002).
+ *   - (DesktopBronstein08): I. N. Bronstein et al., ISBN: 978-3-8171-2017-8 (2008) [in its HTML version "Desktop Bronstein"].
+ *   - (Bronstein08): I. N. Bronstein et al., ISBN: 978-3-8171-2017-8 (2008) [in its paperback version].
+ *   - (Kuipers02): J. B. Kuipers, ISBN: 0-691-05872-5 (2002).
  */
 
 #ifndef __MATH_CONTS_H__
