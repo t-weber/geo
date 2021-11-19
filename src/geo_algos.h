@@ -69,13 +69,23 @@
 	#define __GEO2D_USE_CGAL_SDG2__
 #endif
 
-#include <libqhullcpp/Qhull.h>
-#include <libqhullcpp/QhullFacet.h>
-#include <libqhullcpp/QhullRidge.h>
-#include <libqhullcpp/QhullFacetList.h>
-#include <libqhullcpp/QhullFacetSet.h>
-#include <libqhullcpp/QhullVertexSet.h>
+#if !__has_include(<libqhullcpp/Qhull.h>)
+	//#pragma message("Qhull.h was not found, disabling.")
+	#error("Qhull.h was not found, please install the qhull development files.")
+#else
+	// Note that there's an issue in at least QhullLinkedList.h and QhullSet.h:
+	// The respective constructors and the destructor of QhullLinkedList,
+	// QhullSet, and QhullSetIterator have a superfluous template argument ...<T>
+	// that causes some compilers to fail!
+	#include <libqhullcpp/Qhull.h>
+	#include <libqhullcpp/QhullFacet.h>
+	#include <libqhullcpp/QhullRidge.h>
+	#include <libqhullcpp/QhullFacetList.h>
+	#include <libqhullcpp/QhullFacetSet.h>
+	#include <libqhullcpp/QhullVertexSet.h>
 
+	#define __GEO2D_USE_QHULL__
+#endif
 
 
 // ----------------------------------------------------------------------------
@@ -1777,6 +1787,8 @@ requires m::is_vec<t_vec> && is_graph<t_graph>
 }
 
 
+
+#ifdef __GEO2D_USE_QHULL__
 /**
  * delaunay triangulation and voronoi vertices
  * @returns [ voronoi vertices, triangles, neighbour triangle indices ]
@@ -1887,6 +1899,7 @@ requires m::is_vec<t_vec>
 
 	return std::make_tuple(voronoi, triags, neighbours);
 }
+#endif
 
 
 
@@ -2103,6 +2116,7 @@ requires m::is_vec<t_vec>
 
 
 
+#ifdef __GEO2D_USE_QHULL__
 /**
  * delaunay triangulation using parabolic trafo
  * @see (Berg 2008), pp. 254-256 and p. 168
@@ -2220,6 +2234,7 @@ requires m::is_vec<t_vec>
 
 	return std::make_tuple(voronoi, triags, neighbours);
 }
+#endif
 
 
 
