@@ -3956,7 +3956,7 @@ requires is_mat<t_mat>
 	const t_real rr = std::sqrt(t_real{1} + t_real{2}*ca*cb*cc - (ca*ca + cb*cb + cc*cc));
 
 	return t_real{2}*pi<t_real> * create<t_mat>({
-		t_real{1}/a,				t_real{0},						t_real{0},
+		t_real{1}/a,			t_real{0},				t_real{0},
 		t_real{-1}/a * cc/sc,		t_real{1}/b * t_real{1}/sc,		t_real{0},
 		(cc*ca - cb)/(a*sc*rr), 	(cb*cc-ca)/(b*sc*rr),			sc/(c*rr)
 	});
@@ -3971,11 +3971,15 @@ template<class t_mat, class t_vec, class t_real = typename t_mat::value_type>
 t_mat A_matrix(t_real a, t_real b, t_real c, t_real _aa, t_real _bb, t_real _cc)
 requires is_mat<t_mat>
 {
+	// |vb> derived by rotating |va>
 	t_vec va = create<t_vec>({a, 0, 0});
 	t_vec vb = rotation<t_mat, t_vec>(create<t_vec>({0,0,1}), _cc, 1)*va * b/a;
 	t_vec vc = create<t_vec>(va.size());
 
-	// derived using dot products <va|vc>=cos(_bb), and <vb|vc>=cos(_aa)
+	// |vc> derived using dot products:
+	//   component (1) from <va|vc> = a*c*cos(_bb),
+	//   component (2) from <vb|vc> = b*c*cos(_aa),
+	//   component (3) from <vc|vc> = c
 	vc[0] = std::cos(_bb)*c;
 	vc[1] = (std::cos(_aa) * b*c - vb[0]*vc[0]) / vb[1];
 	vc[2] = t_real{0};
