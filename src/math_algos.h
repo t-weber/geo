@@ -3979,7 +3979,7 @@ requires is_mat<t_mat>
 	// |vc> derived using dot products:
 	//   component (1) from <va|vc> = a*c*cos(_bb),
 	//   component (2) from <vb|vc> = b*c*cos(_aa),
-	//   component (3) from <vc|vc> = c
+	//   component (3) from <vc|vc> = c*c
 	vc[0] = std::cos(_bb)*c;
 	vc[1] = (std::cos(_aa) * b*c - vb[0]*vc[0]) / vb[1];
 	vc[2] = t_real{0};
