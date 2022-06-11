@@ -8,7 +8,7 @@
 #ifndef __GEO_HELPERS__
 #define __GEO_HELPERS__
 
-#include <iterator>
+//#include <iterator>
 #include <tuple>
 
 
@@ -19,14 +19,20 @@ constexpr bool is_pair =
 
 
 template<class t_cont>
-class circular_iterator : public std::iterator<
+class circular_iterator /*: public std::iterator<
 	typename std::iterator_traits<typename t_cont::iterator>::iterator_category,
 	typename t_cont::value_type,
 	typename t_cont::difference_type,
 	typename t_cont::pointer,
-	typename t_cont::reference>
+	typename t_cont::reference>*/
 {
 public:
+	using value_type = typename t_cont::value_type;
+	using difference_type = typename t_cont::difference_type;
+	using pointer = typename t_cont::pointer;
+	using reference = typename t_cont::reference;
+
+	using iterator_category = typename std::iterator_traits<typename t_cont::iterator>::iterator_category;
 	using t_iter = typename t_cont::/*const_*/iterator;
 
 public:

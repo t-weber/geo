@@ -2394,6 +2394,8 @@ requires m::is_vec<t_vec>
 
 /**
  * minimum spanning tree
+ * @see https://github.com/boostorg/graph/tree/develop/example
+ * @see http://www.boost.org/doc/libs/1_65_1/libs/graph/doc/table_of_contents.html
  */
 template<class t_vec, class t_edge = std::pair<std::size_t, std::size_t>>
 std::vector<t_edge>
